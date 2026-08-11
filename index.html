@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local Lenz — One Journey. Every Option. One Smart Travel Companion.</title>
+  <meta name="description" content="Local Lenz is India's all-in-one travel assistant. Compare transport fares from Ola, Uber, Rapido, discover places along your route, and access safety information — all from one platform." />
+  <meta name="keywords" content="India travel, compare cab fares, Ola Uber Rapido compare, train bus compare India, tourist places India, travel planner India" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════ NAVBAR ═══════════════════════════ -->
+  <header class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="#hero" class="nav-logo" id="nav-logo-link">
+        <img src="assets/logo.png" alt="Local Lenz Logo" class="logo-img" />
+      </a>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main navigation">
+        <a href="#hero" class="nav-link" data-section="hero">Home</a>
+        <a href="#journey-section" class="nav-link" data-section="journey">Plan Journey</a>
+        <a href="#explore-section" class="nav-link" data-section="explore">Explore</a>
+        <a href="#compare-section" class="nav-link" data-section="compare">Compare</a>
+        <a href="#safety-section" class="nav-link" data-section="safety">Safety</a>
+        <a href="#about-section" class="nav-link" data-section="about">About</a>
+      </nav>
+
+      <div class="nav-actions">
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark/light mode">☀️</button>
+        <button class="btn-login" id="btn-open-login" aria-label="Login to your account">Login</button>
+        <button class="btn-signup" id="btn-open-signup" aria-label="Create an account">Sign Up</button>
+        <button class="hamburger" id="hamburger" aria-label="Toggle mobile menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+    <!-- Mobile nav drawer -->
+    <div class="mobile-nav" id="mobile-nav" aria-hidden="true">
+      <a href="#hero" class="mobile-nav-link">🏠 Home</a>
+      <a href="#journey-section" class="mobile-nav-link">🗺️ Plan Journey</a>
+      <a href="#explore-section" class="mobile-nav-link">🌏 Explore India</a>
+      <a href="#compare-section" class="mobile-nav-link">🔎 Compare</a>
+      <a href="#safety-section" class="mobile-nav-link">🛡️ Safety</a>
+      <a href="#about-section" class="mobile-nav-link">ℹ️ About</a>
+      <div class="mobile-nav-actions">
+        <button class="theme-toggle" id="theme-toggle-mobile" aria-label="Toggle dark/light mode" style="width:100%; border-radius:var(--radius-sm); margin-bottom:12px; display:flex; justify-content:center; gap:8px;">☀️ Theme Mode</button>
+        <button class="btn-login" id="btn-mobile-login">Login</button>
+        <button class="btn-signup" id="btn-mobile-signup">Sign Up</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ═══════════════════════════ HERO ═══════════════════════════ -->
+    <section class="hero" id="hero">
+      <div class="hero-bg-overlay"></div>
+      <div class="hero-particles" id="hero-particles"></div>
+
+      <div class="hero-content fade-in-up">
+        <div class="hero-badge">
+          <span class="badge-dot"></span>
+          🇮🇳 India's Smartest Travel Companion
+        </div>
+        <h1 class="hero-title">
+          <span class="title-local">Local</span><span class="title-lenz">Lenz</span>
+        </h1>
+        <p class="hero-tagline">One Journey. Every Option. One Smart Travel Companion.</p>
+        <p class="hero-subtext">Compare, discover and travel smarter across India — all from one place.</p>
+
+        <!-- SEARCH BOX -->
+        <div class="search-box" id="search-box">
+          <div class="search-fields">
+            <div class="search-field" id="from-field">
+              <div class="field-icon from-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" fill="#0F9B8E"/><circle cx="12" cy="12" r="8" stroke="#0F9B8E" stroke-width="2" fill="none"/></svg>
+              </div>
+              <div class="field-input-wrap">
+                <label class="field-label" for="input-from">From</label>
+                <input type="text" id="input-from" class="field-input" placeholder="Enter starting location" autocomplete="off" aria-label="Starting location" />
+              </div>
+              <div class="autocomplete-dropdown" id="from-dropdown"></div>
+            </div>
+
+            <button class="swap-btn" id="swap-btn" title="Swap locations" aria-label="Swap from and to locations">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+
+            <div class="search-field" id="to-field">
+              <div class="field-icon to-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#F59E0B"/></svg>
+              </div>
+              <div class="field-input-wrap">
+                <label class="field-label" for="input-to">To</label>
+                <input type="text" id="input-to" class="field-input" placeholder="Enter destination" autocomplete="off" aria-label="Destination" />
+              </div>
+              <div class="autocomplete-dropdown" id="to-dropdown"></div>
+            </div>
+          </div>
+
+          <div class="search-actions">
+            <button class="btn-location" id="btn-location" aria-label="Use current location">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" fill="currentColor"/></svg>
+              Use my current location
+            </button>
+            <button class="btn-search" id="btn-search" aria-label="Plan my journey">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z" fill="white"/></svg>
+              Plan My Journey
+            </button>
+          </div>
+        </div>
+
+        <div class="hero-stats">
+          <div class="stat-item"><span class="stat-num">50+</span><span class="stat-label">Cities</span></div>
+          <div class="stat-divider"></div>
+          <div class="stat-item"><span class="stat-num">4</span><span class="stat-label">Transport Modes</span></div>
+          <div class="stat-divider"></div>
+          <div class="stat-item"><span class="stat-num">Free</span><span class="stat-label">Always</span></div>
+        </div>
+      </div>
+
+      <div class="hero-scroll-hint">
+        <span>Scroll to explore</span>
+        <div class="scroll-arrow"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════ JOURNEY RESULTS ═══════════════════════════ -->
+    <section class="journey-section" id="journey-section">
+      <div class="container">
+
+        <!-- Loading State -->
+        <div class="journey-loading" id="journey-loading" style="display:none;">
+          <div class="loading-spinner"></div>
+          <p class="loading-text">Finding best routes for you…</p>
+          <p class="loading-sub">Comparing fares across all providers</p>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="journey-results" id="journey-results" style="display:none;">
+          <div class="results-header">
+            <div class="results-route-display">
+              <span class="route-from" id="result-from">Delhi</span>
+              <div class="route-arrow">
+                <svg width="32" height="16" viewBox="0 0 32 16" fill="none"><path d="M0 8h28M22 2l8 6-8 6" stroke="#0F9B8E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <span class="route-to" id="result-to">Agra</span>
+            </div>
+            <div class="results-meta-row">
+              <div class="results-meta">
+                <span id="result-distance">~200 km</span>
+                <span class="meta-sep">•</span>
+                <span id="result-date">Today</span>
+              </div>
+              <button class="btn-save-trip" id="btn-save-trip" aria-label="Save this trip">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+                Save Trip
+              </button>
+            </div>
+          </div>
+
+          <!-- Journey Flow Steps -->
+          <div class="journey-flow-bar" id="journey-flow-bar">
+            <div class="jf-step active" data-step="transport">🚌 Transport</div>
+            <div class="jf-arrow">›</div>
+            <div class="jf-step" data-step="stops">📍 Stops</div>
+            <div class="jf-arrow">›</div>
+            <div class="jf-step" data-step="itinerary">🗓 Itinerary</div>
+            <div class="jf-arrow">›</div>
+            <div class="jf-step" data-step="budget">💰 Budget</div>
+            <div class="jf-arrow">›</div>
+            <div class="jf-step" data-step="weather">🌤 Weather</div>
+            <div class="jf-arrow">›</div>
+            <div class="jf-step" data-step="safety">🛡 Safety</div>
+          </div>
+
+          <!-- ── STEP 1: Transport Mode Selector ── -->
+          <div class="mode-selector-section" id="mode-selector-section">
+            <h2 class="section-subheading">Choose Your Mode of Travel</h2>
+            <p class="mode-selector-hint">Select a mode to see fare comparisons from top providers</p>
+            <div class="mode-selector-grid" id="mode-selector-grid">
+              <button class="mode-btn active" data-mode="all" aria-pressed="true">
+                <span class="mode-icon">🗺️</span>
+                <span class="mode-name">All Options</span>
+              </button>
+              <button class="mode-btn" data-mode="cab" aria-pressed="false">
+                <span class="mode-icon">🚕</span>
+                <span class="mode-name">Cab</span>
+              </button>
+              <button class="mode-btn" data-mode="bike" aria-pressed="false">
+                <span class="mode-icon">🏍️</span>
+                <span class="mode-name">Bike Taxi</span>
+              </button>
+              <button class="mode-btn" data-mode="auto" aria-pressed="false">
+                <span class="mode-icon">🛺</span>
+                <span class="mode-name">Auto</span>
+              </button>
+              <button class="mode-btn" data-mode="share" aria-pressed="false">
+                <span class="mode-icon">🚐</span>
+                <span class="mode-name">Share Cab</span>
+              </button>
+              <button class="mode-btn" data-mode="train" aria-pressed="false">
+                <span class="mode-icon">🚆</span>
+                <span class="mode-name">Train</span>
+              </button>
+              <button class="mode-btn" data-mode="bus" aria-pressed="false">
+                <span class="mode-icon">🚌</span>
+                <span class="mode-name">Bus</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Provider Fare Comparison Panel ── -->
+          <div class="provider-comparison" id="provider-comparison" style="display:none;">
+            <div class="provider-header">
+              <div class="provider-title-row">
+                <span class="provider-mode-icon" id="provider-mode-icon">🚕</span>
+                <h3 class="provider-title" id="provider-title">Cab Fare Comparison</h3>
+                <span class="provider-badge">⚡ Live Mock Data</span>
+              </div>
+              <p class="provider-subtitle">Lowest fare highlighted. Tap to book on respective app.</p>
+            </div>
+            <div class="provider-cards-grid" id="provider-cards-grid">
+              <!-- dynamically rendered -->
+            </div>
+            <button class="btn-back-modes" id="btn-back-modes" aria-label="Back to all transport options">
+              ← Back to all options
+            </button>
+          </div>
+
+          <!-- ── All Transport Overview Cards ── -->
+          <div class="transport-overview" id="transport-overview">
+            <!-- Filter Bar -->
+            <div class="filter-bar" id="compare-section">
+              <span class="filter-label">Sort by:</span>
+              <button class="filter-btn active" id="filter-cheapest" aria-pressed="true">💰 Cheapest</button>
+              <button class="filter-btn" id="filter-fastest" aria-pressed="false">⚡ Fastest</button>
+              <button class="filter-btn" id="filter-convenient" aria-pressed="false">✨ Convenient</button>
+            </div>
+
+            <div class="transport-cards-grid" id="transport-cards-grid">
+              <!-- Dynamically rendered transport cards -->
+            </div>
+          </div>
+
+          <!-- ── STOPS ALONG THE WAY ── -->
+          <div class="stops-section" id="stops-section">
+            <div class="stops-header">
+              <div>
+                <h2 class="section-heading stops-title">📍 Stops Along the Way</h2>
+                <p class="stops-tagline">Why go directly when you can discover more on the way?</p>
+              </div>
+              <button class="btn-add-stop" id="btn-add-stop" aria-label="Add a stop to your journey">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Stop
+              </button>
+            </div>
+
+            <!-- Add Stop Input (hidden by default) -->
+            <div class="add-stop-row" id="add-stop-row" style="display:none;">
+              <div class="add-stop-input-wrap">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#0F9B8E"/></svg>
+                <input type="text" id="add-stop-input" placeholder="Search city or landmark…" autocomplete="off" aria-label="Add a stop" />
+                <div class="autocomplete-dropdown" id="stop-dropdown"></div>
+              </div>
+              <button class="btn-confirm-stop" id="btn-confirm-stop">Add to Route</button>
+              <button class="btn-cancel-stop" id="btn-cancel-stop">Cancel</button>
+            </div>
+
+            <!-- Stops Timeline -->
+            <div class="stops-timeline" id="stops-timeline">
+              <!-- Dynamically rendered -->
+            </div>
+
+            <!-- Discovery detail cards -->
+            <div class="discovery-cards-grid" id="discovery-cards-grid" style="margin-top:20px;">
+              <!-- Dynamically rendered -->
+            </div>
+          </div>
+
+          <!-- AI Itinerary -->
+          <div class="result-sub-section" id="itinerary-section">
+            <div class="rss-header">
+              <div class="rss-icon">🗓</div>
+              <div>
+                <h3 class="rss-title">Suggested Itinerary</h3>
+                <p class="rss-sub">A smart day-plan based on your route <span class="rss-badge">AI-Powered (Mock)</span></p>
+              </div>
+            </div>
+            <div class="itinerary-list" id="itinerary-list"><!-- dynamic --></div>
+          </div>
+
+          <!-- Budget Estimate -->
+          <div class="result-sub-section" id="budget-section">
+            <div class="rss-header">
+              <div class="rss-icon">💰</div>
+              <div>
+                <h3 class="rss-title">Trip Budget Estimate</h3>
+                <p class="rss-sub">Approximate costs for your journey <span class="rss-badge">Mock Data</span></p>
+              </div>
+            </div>
+            <div class="budget-grid" id="budget-grid"><!-- dynamic --></div>
+          </div>
+
+          <!-- Weather -->
+          <div class="result-sub-section" id="weather-section">
+            <div class="rss-header">
+              <div class="rss-icon">🌤</div>
+              <div>
+                <h3 class="rss-title">Weather at Destination</h3>
+                <p class="rss-sub">Current conditions at <span id="weather-city">your destination</span> <span class="rss-badge">Mock Data</span></p>
+              </div>
+            </div>
+            <div class="weather-row" id="weather-row"><!-- dynamic --></div>
+          </div>
+
+          <!-- Safety Quick Panel -->
+          <div class="result-sub-section safety-quick-panel" id="safety-quick-section">
+            <div class="rss-header">
+              <div class="rss-icon">🛡</div>
+              <div>
+                <h3 class="rss-title">Safety</h3>
+                <p class="rss-sub">Quick access while you travel</p>
+              </div>
+              <div class="safety-sos-inline">
+                <a href="tel:112" class="btn-sos-inline" aria-label="Call emergency 112">🆘 112</a>
+                <button class="btn-share-journey" id="btn-share-journey" aria-label="Share journey">📤 Share</button>
+              </div>
+            </div>
+            <div class="safety-tips-row" id="safety-tips-row"><!-- dynamic --></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════ POPULAR DESTINATIONS ═══════════════════════════ -->
+    <section class="popular-section reveal" id="explore-section">
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-heading">Explore India 🌏</h2>
+          <p class="section-sub">Discover incredible destinations waiting for you</p>
+        </div>
+        <div class="category-tabs" id="category-tabs" role="tablist">
+          <button class="cat-tab active" role="tab" aria-selected="true" data-cat="all">All</button>
+          <button class="cat-tab" role="tab" aria-selected="false" data-cat="historical">🏛️ Historical</button>
+          <button class="cat-tab" role="tab" aria-selected="false" data-cat="mountains">🏔️ Mountains</button>
+          <button class="cat-tab" role="tab" aria-selected="false" data-cat="beaches">🏖️ Beaches</button>
+          <button class="cat-tab" role="tab" aria-selected="false" data-cat="religious">🛕 Religious</button>
+          <button class="cat-tab" role="tab" aria-selected="false" data-cat="nature">🌿 Nature</button>
+          <button class="cat-tab" role="tab" aria-selected="false" data-cat="food">🍛 Food</button>
+          <button class="cat-tab" role="tab" aria-selected="false" data-cat="culture">🎭 Culture</button>
+        </div>
+        <div class="destinations-grid" id="destinations-grid">
+          <!-- Dynamically rendered -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════ SMART FEATURES ═══════════════════════════ -->
+    <section class="features-section reveal">
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-heading">Everything You Need for Your Journey</h2>
+          <p class="section-sub">Local Lenz puts all your travel tools in one smart place</p>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card reveal-child">
+            <div class="feature-icon-wrap blue">🔎</div>
+            <h3>Compare</h3>
+            <p>Side-by-side comparison of train, bus, cab, bike and auto options with fares from Ola, Uber & Rapido.</p>
+          </div>
+          <div class="feature-card reveal-child">
+            <div class="feature-icon-wrap green">💰</div>
+            <h3>Save Money</h3>
+            <p>Find the cheapest way to travel. We surface the lowest fare across all providers automatically.</p>
+          </div>
+          <div class="feature-card reveal-child">
+            <div class="feature-icon-wrap teal">⏱️</div>
+            <h3>Save Time</h3>
+            <p>Fastest route options highlighted. Know which option gets you there quickest.</p>
+          </div>
+          <div class="feature-card reveal-child">
+            <div class="feature-icon-wrap orange">📍</div>
+            <h3>Discover</h3>
+            <p>Find amazing tourist spots, heritage sites and food stops along your route.</p>
+          </div>
+          <div class="feature-card reveal-child">
+            <div class="feature-icon-wrap red">🛡️</div>
+            <h3>Stay Safe</h3>
+            <p>One-tap access to emergency contacts, Women's Safety mode and local helplines.</p>
+          </div>
+          <div class="feature-card reveal-child">
+            <div class="feature-icon-wrap purple">🗺️</div>
+            <h3>Plan Better</h3>
+            <p>Visualise your journey, save routes and access everything from one smart dashboard.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════ EMERGENCY & SAFETY HUB ═══════════════════════════ -->
+    <section class="safety-section reveal" id="safety-section">
+      <div class="container">
+        <div class="section-header safety-header">
+          <div class="safety-badge">🛡️ Safety First</div>
+          <h2 class="section-heading">Travel Safe with Local Lenz</h2>
+          <p class="section-sub">Wherever you go, help should never be far away.</p>
+          <p class="safety-disclaimer">⚠️ Prototype: Verify all numbers with official government sources before use in production.</p>
+        </div>
+
+        <div class="emergency-grid">
+          <div class="emergency-card reveal-child" data-number="100">
+            <div class="emergency-icon police">🚓</div>
+            <h3>Police</h3>
+            <div class="emergency-number">100</div>
+            <a href="tel:100" class="btn-call police-btn" aria-label="Call Police emergency number 100">Call Now</a>
+          </div>
+          <div class="emergency-card reveal-child" data-number="108">
+            <div class="emergency-icon medical">🚑</div>
+            <h3>Medical Emergency</h3>
+            <div class="emergency-number">108</div>
+            <a href="tel:108" class="btn-call medical-btn" aria-label="Call Medical emergency number 108">Call Now</a>
+          </div>
+          <div class="emergency-card reveal-child" data-number="101">
+            <div class="emergency-icon fire">🔥</div>
+            <h3>Fire</h3>
+            <div class="emergency-number">101</div>
+            <a href="tel:101" class="btn-call fire-btn" aria-label="Call Fire emergency number 101">Call Now</a>
+          </div>
+          <div class="emergency-card reveal-child" data-number="1091">
+            <div class="emergency-icon women">👩</div>
+            <h3>Women Safety</h3>
+            <div class="emergency-number">1091</div>
+            <a href="tel:1091" class="btn-call women-btn" aria-label="Call Women Safety helpline 1091">Call Now</a>
+          </div>
+          <div class="emergency-card reveal-child" data-number="1078">
+            <div class="emergency-icon disaster">🌪️</div>
+            <h3>Natural Disaster</h3>
+            <div class="emergency-number">1078</div>
+            <a href="tel:1078" class="btn-call disaster-btn" aria-label="Call Disaster helpline 1078">Call Now</a>
+          </div>
+          <div class="emergency-card reveal-child" data-number="112">
+            <div class="emergency-icon general">🆘</div>
+            <h3>General Emergency</h3>
+            <div class="emergency-number">112</div>
+            <a href="tel:112" class="btn-call general-btn" aria-label="Call General Emergency 112">Call Now</a>
+          </div>
+        </div>
+
+        <!-- Safety Hub Actions -->
+        <div class="safety-hub-actions reveal">
+          <button class="btn-sos" id="btn-sos" aria-label="Activate SOS alert">🆘 SOS</button>
+          <button class="btn-safety-action btn-share-journey" aria-label="Share trip location">📤 Share Trip</button>
+          <button class="btn-safety-action" id="btn-trusted-contact" aria-label="Add trusted contact">👥 Trusted Contact</button>
+          <button class="btn-safety-action" id="btn-safety-tips-btn" aria-label="View safety tips">💡 Safety Tips</button>
+          <button class="btn-womens-mode" id="btn-womens-mode" aria-label="Activate Women's Safety Mode" aria-pressed="false">💜 Women's Mode</button>
+        </div>
+
+        <!-- Women's Safety Mode — compact expandable panel -->
+        <div class="womens-panel" id="womens-panel" aria-hidden="true" style="display:none;">
+          <div class="womens-panel-inner">
+            <div class="womens-panel-header">
+              <span>💜 Women's Safety Mode — Active</span>
+              <button class="womens-panel-close" id="btn-womens-close" aria-label="Deactivate Women's Safety Mode">✕</button>
+            </div>
+            <div class="womens-panel-body">
+              <a href="tel:1091" class="wp-item"><span class="wp-num">1091</span><span>Women Helpline</span></a>
+              <a href="tel:100" class="wp-item"><span class="wp-num">100</span><span>Police</span></a>
+              <a href="tel:108" class="wp-item"><span class="wp-num">108</span><span>Ambulance</span></a>
+              <button class="wp-item" onclick="showToast('Location shared with trusted contacts', 'success')"><span class="wp-num">📍</span><span>Share Location</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════ ABOUT ═══════════════════════════ -->
+    <section class="about-section reveal" id="about-section">
+      <div class="container">
+        <div class="about-grid">
+          <div class="about-content">
+            <div class="about-badge">About Local Lenz</div>
+            <h2 class="section-heading">What is Local Lenz?</h2>
+            <p class="about-text">Local Lenz is an all-in-one travel platform designed to make travelling across India simpler, safer and smarter. Instead of switching between multiple apps to compare transport, discover destinations and find emergency information, users can access everything from one place.</p>
+            <p class="about-text">Whether you're a student travelling intercity, a family exploring heritage sites, or a solo traveller navigating unfamiliar roads — Local Lenz is your smart companion every step of the way.</p>
+            <div class="about-values">
+              <div class="value-item"><span class="value-icon">🎯</span><span>Built for Bharat</span></div>
+              <div class="value-item"><span class="value-icon">💡</span><span>Smart & Simple</span></div>
+              <div class="value-item"><span class="value-icon">🔒</span><span>Safety First</span></div>
+              <div class="value-item"><span class="value-icon">🆓</span><span>Free Forever</span></div>
+            </div>
+          </div>
+          <div class="about-visual">
+            <div class="about-stat-cards">
+              <div class="about-stat-card">
+                <div class="as-icon">🚀</div>
+                <div class="as-number">2024</div>
+                <div class="as-label">Founded</div>
+              </div>
+              <div class="about-stat-card highlight">
+                <div class="as-icon">🌏</div>
+                <div class="as-number">50+</div>
+                <div class="as-label">Cities Covered</div>
+              </div>
+              <div class="about-stat-card">
+                <div class="as-icon">🤝</div>
+                <div class="as-number">4+</div>
+                <div class="as-label">Transport Modes</div>
+              </div>
+              <div class="about-stat-card highlight">
+                <div class="as-icon">🛡️</div>
+                <div class="as-number">24/7</div>
+                <div class="as-label">Safety Access</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════════════ FOOTER ═══════════════════════════ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="#hero" class="nav-logo footer-logo">
+            <img src="assets/logo.png" alt="Local Lenz Logo" class="logo-img" />
+          </a>
+          <p class="footer-tagline">Travel smarter. Discover more. Stay safer.</p>
+          <div class="social-icons">
+            <a href="#" class="social-icon" aria-label="Twitter">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
+            </a>
+            <a href="#" class="social-icon" aria-label="Instagram">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            </a>
+            <a href="#" class="social-icon" aria-label="LinkedIn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
+            </a>
+            <a href="#" class="social-icon" aria-label="YouTube">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M22.54 6.42a2.78 2.78 0 00-1.94-1.96C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 00-1.94 1.96A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.4 19.54C5.12 20 12 20 12 20s6.88 0 8.6-.46a2.78 2.78 0 001.94-1.96A29 29 0 0023 12a29 29 0 00-.46-5.58z"/><polygon points="9.75,15.02 15.5,12 9.75,8.98 9.75,15.02" fill="white"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <h4 class="footer-col-title">Quick Links</h4>
+          <ul class="footer-links">
+            <li><a href="#hero">Home</a></li>
+            <li><a href="#journey-section">Plan Journey</a></li>
+            <li><a href="#explore-section">Explore India</a></li>
+            <li><a href="#safety-section">Safety Hub</a></li>
+            <li><a href="#about-section">About</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 class="footer-col-title">Transport</h4>
+          <ul class="footer-links">
+            <li><a href="#journey-section">Compare Cabs</a></li>
+            <li><a href="#journey-section">Train Options</a></li>
+            <li><a href="#journey-section">Bus Routes</a></li>
+            <li><a href="#journey-section">Bike Taxis</a></li>
+            <li><a href="#journey-section">Auto Rickshaw</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 class="footer-col-title">Legal & Contact</h4>
+          <ul class="footer-links">
+            <li><a href="#">Contact Us</a></li>
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms & Conditions</a></li>
+            <li><a href="#">Help & Support</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>© 2024 Local Lenz. All rights reserved. | 🇮🇳 Made with ❤️ for Bharat</p>
+        <p class="footer-disclaimer">⚠️ This is a prototype. Mock data is used for demonstration. Emergency numbers should be verified with official sources.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ═══════════════════════════ LOGIN / SIGNUP MODAL ═══════════════════════════ -->
+  <div class="modal-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-label="Login or Sign Up" style="display:none;">
+    <div class="modal-box" id="modal-box">
+      <button class="modal-close" id="modal-close" aria-label="Close modal">✕</button>
+
+      <!-- Login Form -->
+      <div class="auth-form" id="login-form">
+        <div class="auth-header">
+          <div class="auth-logo">🗺️</div>
+          <h2>Welcome Back!</h2>
+          <p>Login to access your saved journeys</p>
+        </div>
+        <form id="login-form-el" novalidate>
+          <div class="form-group">
+            <label for="login-email">Email or Phone</label>
+            <input type="text" id="login-email" placeholder="Enter email or phone" required />
+            <span class="form-error" id="login-email-err"></span>
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <div class="password-wrap">
+              <input type="password" id="login-password" placeholder="Enter password" required />
+              <button type="button" class="toggle-pw" data-target="login-password" aria-label="Toggle password visibility">👁</button>
+            </div>
+            <span class="form-error" id="login-pw-err"></span>
+          </div>
+          <button type="submit" class="btn-auth-submit">Login to Local Lenz</button>
+        </form>
+        <p class="auth-switch">Don't have an account? <button class="auth-switch-btn" id="switch-to-signup">Sign Up</button></p>
+      </div>
+
+      <!-- Signup Form -->
+      <div class="auth-form" id="signup-form" style="display:none;">
+        <div class="auth-header">
+          <div class="auth-logo">✈️</div>
+          <h2>Join Local Lenz</h2>
+          <p>Create your free travel account</p>
+        </div>
+        <form id="signup-form-el" novalidate>
+          <div class="form-group">
+            <label for="signup-name">Full Name</label>
+            <input type="text" id="signup-name" placeholder="Enter your name" required />
+            <span class="form-error" id="signup-name-err"></span>
+          </div>
+          <div class="form-group">
+            <label for="signup-email">Email</label>
+            <input type="email" id="signup-email" placeholder="Enter your email" required />
+            <span class="form-error" id="signup-email-err"></span>
+          </div>
+          <div class="form-group">
+            <label for="signup-phone">Phone Number</label>
+            <input type="tel" id="signup-phone" placeholder="+91 XXXXX XXXXX" />
+          </div>
+          <div class="form-group">
+            <label for="signup-password">Password</label>
+            <div class="password-wrap">
+              <input type="password" id="signup-password" placeholder="Create password" required />
+              <button type="button" class="toggle-pw" data-target="signup-password" aria-label="Toggle password visibility">👁</button>
+            </div>
+            <span class="form-error" id="signup-pw-err"></span>
+          </div>
+          <button type="submit" class="btn-auth-submit">Create Account</button>
+        </form>
+        <p class="auth-switch">Already have an account? <button class="auth-switch-btn" id="switch-to-login">Login</button></p>
+      </div>
+
+      <!-- Logged-in Dashboard -->
+      <div class="auth-form" id="user-dashboard" style="display:none;">
+        <div class="auth-header">
+          <div class="auth-logo">👋</div>
+          <h2 id="dashboard-greeting">Welcome back!</h2>
+          <p>Your travel dashboard</p>
+        </div>
+        <div class="dashboard-sections">
+          <div class="dash-section">
+            <h4>📍 Recent Searches</h4>
+            <div class="recent-list" id="recent-list">
+              <p class="empty-state">No recent journeys yet</p>
+            </div>
+          </div>
+          <div class="dash-section">
+            <h4>❤️ Saved Journeys</h4>
+            <div class="saved-list" id="saved-list">
+              <p class="empty-state">No saved journeys yet</p>
+            </div>
+          </div>
+        </div>
+        <button class="btn-logout" id="btn-logout">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOS Modal -->
+  <div class="modal-overlay" id="sos-modal" role="dialog" aria-modal="true" aria-label="SOS Alert" style="display:none;">
+    <div class="modal-box sos-modal-box">
+      <button class="modal-close" id="sos-modal-close" aria-label="Close SOS modal">✕</button>
+      <div class="sos-content">
+        <div class="sos-icon-big">🆘</div>
+        <h2>SOS Alert Activated</h2>
+        <p>In a real app, your emergency contacts would be notified and your location shared instantly.</p>
+        <div class="sos-call-btns">
+          <a href="tel:112" class="btn-sos-call">📞 Call 112 — General Emergency</a>
+          <a href="tel:1091" class="btn-sos-call women">📞 Call 1091 — Women Safety</a>
+          <a href="tel:100" class="btn-sos-call police">📞 Call 100 — Police</a>
+        </div>
+        <p class="sos-disclaimer">⚠️ Prototype only. Verify numbers with official government sources.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
