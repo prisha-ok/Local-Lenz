@@ -24,11 +24,13 @@ const INDIAN_CITIES = [
   "Mangaluru", "Mumbai", "Mysuru", "Nagpur", "Nashik", "Noida",
   "Patna", "Pune", "Raipur", "Rajkot", "Ranchi", "Shimla", "Siliguri",
   "Surat", "Thiruvananthapuram", "Udaipur", "Varanasi", "Vijayawada",
-  "Visakhapatnam", "Vrindavan", "Mathura"
+  "Visakhapatnam", "Vrindavan", "Mathura", "Lajpat Nagar, Delhi", "Chandni Chowk, Delhi"
 ];
 
 // Route data: key = "From|To", value = route info
 const ROUTE_DATA = {
+  "Lajpat Nagar, Delhi|Chandni Chowk, Delhi": { distance: 15, duration_road: 40, stops: ["Sarojini Nagar", "India Gate"] },
+  "Lajpat Nagar|Chandni Chowk": { distance: 15, duration_road: 40, stops: ["Sarojini Nagar", "India Gate"] },
   "Delhi|Agra": { distance: 206, duration_road: 180, stops: ["Mathura", "Vrindavan", "Faridabad", "Bharatpur"] },
   "Delhi|Jaipur": { distance: 281, duration_road: 270, stops: ["Gurugram", "Alwar", "Behror", "Neemrana"] },
   "Mumbai|Pune": { distance: 148, duration_road: 150, stops: ["Panvel", "Khopoli", "Lonavala", "Khandala"] },
@@ -90,6 +92,14 @@ const DESTINATIONS = [
 
 // Discovery stops per known routes
 const DISCOVERY_STOPS = {
+  "Lajpat Nagar, Delhi|Chandni Chowk, Delhi": [
+    { name: "Sarojini Nagar", emoji: "🛍️", desc: "India's premier budget fashion market. Great local shopping experience.", dist: "~5 km from route", category: "Shopping", duration: "60 min", cost: 150 },
+    { name: "India Gate", emoji: "🏛️", desc: "Historic national war memorial surrounded by gardens and fountains.", dist: "~8 km from route", category: "Heritage", duration: "45 min", cost: 50 }
+  ],
+  "Lajpat Nagar|Chandni Chowk": [
+    { name: "Sarojini Nagar", emoji: "🛍️", desc: "India's premier budget fashion market. Great local shopping experience.", dist: "~5 km from route", category: "Shopping", duration: "60 min", cost: 150 },
+    { name: "India Gate", emoji: "🏛️", desc: "Historic national war memorial surrounded by gardens and fountains.", dist: "~8 km from route", category: "Heritage", duration: "45 min", cost: 50 }
+  ],
   "Delhi|Agra": [
     { name: "Mathura", emoji: "🛕", desc: "Birthplace of Lord Krishna; dotted with temples and ghats.", dist: "~50 km from route" },
     { name: "Vrindavan", emoji: "🌸", desc: "Sacred town of temples, the playground of young Krishna.", dist: "~55 km from route" },
@@ -338,17 +348,17 @@ function triggerSearch() {
   const toVal = document.getElementById('input-to').value.trim();
 
   if (!fromVal) {
-    showToast('Please enter a starting location', 'error');
+    showToast('Please enter your starting location.', 'error');
     document.getElementById('input-from').focus();
     return;
   }
   if (!toVal) {
-    showToast('Please enter a destination', 'error');
+    showToast('Please enter your destination.', 'error');
     document.getElementById('input-to').focus();
     return;
   }
   if (fromVal.toLowerCase() === toVal.toLowerCase()) {
-    showToast('Start and destination cannot be the same!', 'error');
+    showToast('Starting point and destination cannot be the same.', 'error');
     return;
   }
 
@@ -362,10 +372,32 @@ function triggerSearch() {
   document.getElementById('journey-section').scrollIntoView({ behavior: 'smooth' });
 
   showLoading();
+  
+  const loadingStepsContainer = document.getElementById('loading-steps');
+  const stepsText = [
+    "Checking route",
+    "Comparing transportation",
+    "Discovering places",
+    "Preparing itinerary",
+    "Estimating budget"
+  ];
+  
+  loadingStepsContainer.innerHTML = "";
+  
+  stepsText.forEach((step, idx) => {
+    setTimeout(() => {
+      const stepEl = document.createElement('div');
+      stepEl.className = "loading-step-item fade-in-up";
+      stepEl.style.cssText = "display:flex; align-items:center; gap:8px; animation: fadeInUp 0.3s ease forwards;";
+      stepEl.innerHTML = `<span style="color:var(--color-accent); font-weight:bold;">✓</span> <span>${step}</span>`;
+      loadingStepsContainer.appendChild(stepEl);
+    }, (idx + 1) * 300);
+  });
+
   setTimeout(() => {
     hideLoading();
     renderResults();
-  }, 1800); // Simulated loading time
+  }, 1900); // 1.9 seconds total
 }
 
 function showLoading() {
@@ -373,7 +405,7 @@ function showLoading() {
   document.getElementById('journey-results').style.display = 'none';
   const btn = document.getElementById('btn-search');
   btn.classList.add('loading');
-  btn.innerHTML = `<div class="loading-spinner" style="width:20px;height:20px;border-width:2px;border-color:rgba(255,255,255,.3);border-top-color:white;"></div> Searching…`;
+  btn.innerHTML = `<div class="loading-spinner" style="width:20px;height:20px;border-width:2px;border-color:rgba(255,255,255,.3);border-top-color:white;margin-right:8px;"></div> Searching…`;
 }
 
 function hideLoading() {
@@ -539,8 +571,19 @@ window.handleBookProvider = function(provider, mode, fare) {
 function renderTransportCards(routeData) {
   const dist = routeData.distance;
   const roadTime = routeData.duration_road;
+  const isDelhi = (state.fromCity.toLowerCase().includes("delhi") || state.toCity.toLowerCase().includes("delhi"));
 
   const cards = [
+    {
+      type: 'metro', icon: '🚇', title: 'Metro',
+      fare: isDelhi ? '₹40' : '₹60',
+      duration: '35 min',
+      options: 'Delhi Metro Rail (DMRC)',
+      distance: `${dist} km`,
+      badge: isDelhi ? 'Recommended' : 'Economical',
+      action: 'View Metro Info',
+      note: 'Yellow & Blue Lines'
+    },
     {
       type: 'train', icon: '🚆', title: 'Train',
       fare: `₹${Math.round(calcTrainFare(dist) * dist)}`,
@@ -599,13 +642,13 @@ function renderTransportCards(routeData) {
 
 function sortCards(cards, filter) {
   if (filter === 'cheapest') {
-    cards.sort((a, b) => parseInt(a.fare.replace(/[₹,]/g, '')) - parseInt(b.fare.replace(/[₹,]/g, '')));
+    cards.sort((a, b) => parseInt(a.fare.replace(/[₹,–]/g, '')) - parseInt(b.fare.replace(/[₹,–]/g, '')));
   } else if (filter === 'fastest') {
-    // Bike/Cab first
-    const order = ['bike', 'cab', 'train', 'bus', 'auto'];
+    // Metro/Bike/Cab first
+    const order = ['metro', 'bike', 'cab', 'train', 'bus', 'auto'];
     cards.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
   } else { // convenient
-    const order = ['cab', 'train', 'bike', 'auto', 'bus'];
+    const order = ['metro', 'cab', 'train', 'bike', 'auto', 'bus'];
     cards.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
   }
 }
@@ -669,12 +712,97 @@ window.handleTransportAction = function(type) {
     document.getElementById('transport-overview').style.display = 'none';
     showProviderComparison(type);
     document.getElementById('mode-selector-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else if (type === 'metro') {
+    showMetroInfo();
+    document.getElementById('mode-selector-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } else if (type === 'train') {
     showToast('🚆 In production: connects to IRCTC / Rail API', 'info', 3000);
   } else if (type === 'bus') {
     showToast('🚌 In production: connects to RedBus / State Transport API', 'info', 3000);
   }
 };
+
+function showMetroInfo() {
+  const compEl = document.getElementById('provider-comparison');
+  compEl.style.display = 'block';
+  document.getElementById('transport-overview').style.display = 'none';
+  document.getElementById('provider-mode-icon').textContent = '🚇';
+  document.getElementById('provider-title').textContent = 'Delhi Metro — Route Info';
+
+  const isDelhi = (state.fromCity.toLowerCase().includes('delhi') || state.toCity.toLowerCase().includes('delhi'));
+
+  const grid = document.getElementById('provider-cards-grid');
+  if (isDelhi) {
+    grid.innerHTML = `
+      <div class="provider-card lowest" style="grid-column:1/-1;">
+        <div class="lowest-badge">🚇 RECOMMENDED ROUTE</div>
+        <div class="provider-logo-row">
+          <span class="provider-emoji">🔵</span>
+          <div class="provider-name-col">
+            <span class="provider-name">Delhi Metro Rail Corporation (DMRC)</span>
+            <span class="provider-type">Yellow Line / Blue Line</span>
+          </div>
+        </div>
+        <div class="provider-fare">₹40<span> approx</span></div>
+        <div class="provider-meta-row">
+          <span class="provider-meta-item">⏱ 35 min</span>
+          <span class="provider-meta-item">🏪 Interchange at Rajiv Chowk</span>
+          <span class="provider-meta-item">🕐 First train: 5:30 AM</span>
+        </div>
+        <div style="padding:12px 16px;font-size:0.85rem;color:var(--gray-600);background:rgba(0,0,0,0.03);border-radius:8px;margin-top:8px;line-height:1.6;">
+          <strong>Sample Route:</strong> Lajpat Nagar (Violet Line) → Central Secretariat → Chawri Bazar (Yellow Line) → Chandni Chowk<br>
+          <span style="color:var(--color-accent);font-size:0.8rem;">⚠️ Sample data — verify on DMRC website or app for actual fares and schedules.</span>
+        </div>
+        <button class="btn-book-provider" onclick="showToast('Opening DMRC official app… (Production: deep-link)', 'info', 3000)">
+          ✓ View on DMRC App
+        </button>
+      </div>
+      <div class="provider-card">
+        <div class="provider-logo-row">
+          <span class="provider-emoji">🟠</span>
+          <div class="provider-name-col">
+            <span class="provider-name">Rapid Metro / Airport Line</span>
+            <span class="provider-type">Orange Line</span>
+          </div>
+        </div>
+        <div class="provider-fare">₹60<span> approx</span></div>
+        <div class="provider-meta-row">
+          <span class="provider-meta-item">⏱ 20 min (Airport Express)</span>
+          <span class="provider-meta-item">🛄 Luggage storage available</span>
+        </div>
+        <button class="btn-book-provider" onclick="showToast('Airport Express info: check DMRC. (Sample data)', 'info', 3000)">
+          View Airport Express
+        </button>
+      </div>
+      <div class="provider-card">
+        <div class="provider-logo-row">
+          <span class="provider-emoji">🟣</span>
+          <div class="provider-name-col">
+            <span class="provider-name">Magenta Line / Pink Line</span>
+            <span class="provider-type">Phase III Corridors</span>
+          </div>
+        </div>
+        <div class="provider-fare">₹30–₹55<span> approx</span></div>
+        <div class="provider-meta-row">
+          <span class="provider-meta-item">⏱ 25–40 min</span>
+          <span class="provider-meta-item">♿ Accessible stations</span>
+        </div>
+        <button class="btn-book-provider" onclick="showToast('Check DMRC app for Magenta/Pink Line stops. (Sample)', 'info', 3000)">
+          View Line Details
+        </button>
+      </div>
+    `;
+  } else {
+    grid.innerHTML = `
+      <div class="provider-card" style="grid-column:1/-1;text-align:center;padding:30px;">
+        <div style="font-size:2rem;margin-bottom:12px;">🚇</div>
+        <p style="font-size:1rem;color:var(--gray-600);">Metro is available in Delhi, Mumbai, Bengaluru, Hyderabad, Chennai &amp; Kolkata.</p>
+        <p style="font-size:0.85rem;color:var(--gray-400);margin-top:8px;">Select a city route to view metro line information. (Sample data)</p>
+      </div>
+    `;
+  }
+  compEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
 
 /* ════════════════════════════════════════════════════════════════
    FILTERS
@@ -900,44 +1028,160 @@ window.addStopFromDiscovery = function(name, desc, emoji) {
 };
 
 function renderMockMapFromStops() {
-  // Unused helper or updates custom inline stops if any
+  // Build an inline SVG route diagram from currentStops
+  const stops = state.currentStops;
+  if (!stops || stops.length === 0) return;
+
+  // Find or create the SVG map container
+  let mapContainer = document.getElementById('route-map-svg-wrap');
+  if (!mapContainer) {
+    const stopsSection = document.getElementById('stops-section');
+    if (!stopsSection) return;
+    mapContainer = document.createElement('div');
+    mapContainer.id = 'route-map-svg-wrap';
+    mapContainer.style.cssText = 'margin:24px 0 8px;overflow-x:auto;';
+    // Insert before the discovery cards grid
+    const discoveryGrid = document.getElementById('discovery-cards-grid');
+    stopsSection.insertBefore(mapContainer, discoveryGrid);
+  }
+
+  const svgW = Math.max(500, stops.length * 160);
+  const svgH = 120;
+  const nodeR = 14;
+  const y = svgH / 2;
+  const gap = (svgW - 60) / (stops.length - 1 || 1);
+
+  const nodeColors = stops.map((s, i) => {
+    if (i === 0) return '#3B82F6';          // start — blue
+    if (i === stops.length - 1) return '#F59E0B'; // end — amber
+    if (s.type === 'recommended') return '#10B981'; // recommended — green
+    return '#8B5CF6';                       // user-added — purple
+  });
+
+  let svgNodes = '';
+  let svgLines = '';
+
+  stops.forEach((stop, i) => {
+    const x = 30 + i * gap;
+    const prevX = i > 0 ? 30 + (i - 1) * gap : null;
+
+    // Connector line
+    if (i > 0) {
+      svgLines += `<line x1="${prevX + nodeR}" y1="${y}" x2="${x - nodeR}" y2="${y}" stroke="#CBD5E1" stroke-width="3" stroke-dasharray="6 3"/>`;
+    }
+
+    // Node circle
+    const color = nodeColors[i];
+    const isEnd = i === stops.length - 1;
+    svgNodes += `
+      <circle cx="${x}" cy="${y}" r="${nodeR}" fill="${color}" opacity="0.15"/>
+      <circle cx="${x}" cy="${y}" r="${nodeR - 4}" fill="${color}"/>
+      <text x="${x}" y="${y + 4}" text-anchor="middle" font-size="10" fill="white" font-weight="bold">${i + 1}</text>
+      <text x="${x}" y="${y + nodeR + 14}" text-anchor="middle" font-size="10" fill="#374151" font-weight="600">${stop.name.length > 14 ? stop.name.slice(0, 13) + '…' : stop.name}</text>
+      <text x="${x}" y="${y - nodeR - 6}" text-anchor="middle" font-size="9" fill="${color}">${i === 0 ? 'START' : isEnd ? 'END' : (stop.type === 'recommended' ? '⭐ Rec.' : '📍 Stop')}</text>
+    `;
+  });
+
+  mapContainer.innerHTML = `
+    <div style="font-size:0.8rem;font-weight:700;color:var(--gray-500);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">📍 Route Visualisation</div>
+    <svg width="100%" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="min-width:${Math.min(svgW, 400)}px;">
+      <rect width="${svgW}" height="${svgH}" rx="12" fill="rgba(241,245,249,0.9)"/>
+      ${svgLines}
+      ${svgNodes}
+    </svg>
+    <p style="font-size:0.72rem;color:var(--gray-400);margin-top:6px;">Schematic only — not to geographical scale.</p>
+  `;
 }
 
 function renderAIItinerary() {
   const container = document.getElementById('itinerary-list');
   const steps = [];
-  
+  const totalStops = state.currentStops.length;
+
+  // Spread available travel hours (8AM to 8PM = 12 hours) across stops
+  const START_HOUR = 8; // 8:00 AM
+  const END_HOUR = 20;  // 8:00 PM
+  const totalMinutes = (END_HOUR - START_HOUR) * 60;
+
+  // Richer activity suggestions per stop type
+  const midActivities = [
+    { icon: '🍽️', label: 'Try local cuisine and street food' },
+    { icon: '📸', label: 'Photograph the landmark and surroundings' },
+    { icon: '🛍️', label: 'Browse local handicrafts and souvenirs' },
+    { icon: '🚶', label: 'Take a guided walking tour of the area' },
+    { icon: '☕', label: 'Relax at a local café and plan next leg' }
+  ];
+
+  function toTimeStr(totalMinFromStart) {
+    const absMin = START_HOUR * 60 + totalMinFromStart;
+    const h = Math.floor(absMin / 60) % 24;
+    const m = absMin % 60;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const dispH = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    return `${dispH}:${m.toString().padStart(2, '0')} ${ampm}`;
+  }
+
   state.currentStops.forEach((stop, i) => {
+    const frac = totalStops > 1 ? i / (totalStops - 1) : 0;
+    const minuteOffset = Math.round(frac * totalMinutes);
+    const timeStr = toTimeStr(minuteOffset);
+
     if (i === 0) {
       steps.push({
-        time: '08:00 AM',
+        time: timeStr,
+        icon: '🚀',
+        tag: 'Departure',
+        tagColor: '#3B82F6',
         title: `Depart from ${stop.name}`,
-        desc: `Begin your journey. Verify fuel level/charge or board your booked train/cab.`
+        desc: `Begin your journey! Confirm your booking, pack essentials, and double-check your travel documents.`,
+        tips: ['Keep ID & tickets ready', 'Share location with a trusted contact', 'Charge your devices']
       });
-    } else if (i === state.currentStops.length - 1) {
+    } else if (i === totalStops - 1) {
       steps.push({
-        time: '06:00 PM',
+        time: timeStr,
+        icon: '🏁',
+        tag: 'Arrival',
+        tagColor: '#F59E0B',
         title: `Arrive at ${stop.name}`,
-        desc: `Welcome to your destination. Check in at your accommodation and unwind.`
+        desc: `Welcome to your destination! Head to your accommodation, freshen up, and explore at your own pace.`,
+        tips: ['Note emergency numbers', 'Check local transport options', 'Explore nearby dining']
       });
     } else {
-      const hour = 8 + i * 2;
-      const pmAm = hour >= 12 ? 'PM' : 'AM';
-      const normHour = hour > 12 ? hour - 12 : hour;
+      const activity = midActivities[(i - 1) % midActivities.length];
+      const stayDuration = Math.max(30, Math.round(totalMinutes / (totalStops + 1)));
+      const nextStop = state.currentStops[i + 1];
+      const isRec = stop.type === 'recommended';
       steps.push({
-        time: `${normHour}:00 ${pmAm}`,
-        title: `Stopover: Explore ${stop.name}`,
-        desc: stop.desc || `Visit local attractions, enjoy delicious regional cuisine, and snap memories.`
+        time: timeStr,
+        icon: isRec ? '⭐' : '📍',
+        tag: isRec ? 'Recommended Stop' : 'Custom Stop',
+        tagColor: isRec ? '#10B981' : '#8B5CF6',
+        title: `Explore ${stop.name}`,
+        desc: stop.desc || `Take ${stayDuration} min to explore this stop. ${activity.icon} ${activity.label}.`,
+        tips: [
+          `Estimated stay: ~${stayDuration} min`,
+          nextStop ? `Next: ${nextStop.name}` : 'Heading to final destination',
+          'Hydrate and rest before continuing'
+        ]
       });
     }
   });
-  
-  container.innerHTML = steps.map(s => `
-    <div class="itinerary-item">
-      <div class="iti-time">${s.time}</div>
+
+  container.innerHTML = steps.map((s, i) => `
+    <div class="itinerary-item" style="--iti-accent:${s.tagColor};">
+      <div class="iti-time">
+        <span>${s.time}</span>
+        <span class="iti-icon">${s.icon}</span>
+      </div>
       <div class="iti-detail">
-        <h4>${s.title}</h4>
-        <p>${s.desc}</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <h4 style="margin:0;font-size:0.95rem;">${s.title}</h4>
+          <span style="font-size:0.7rem;font-weight:700;background:${s.tagColor}20;color:${s.tagColor};padding:2px 8px;border-radius:20px;white-space:nowrap;">${s.tag}</span>
+        </div>
+        <p style="margin:0 0 8px;font-size:0.85rem;color:var(--gray-600);">${s.desc}</p>
+        <ul style="margin:0;padding-left:16px;font-size:0.78rem;color:var(--gray-500);">
+          ${s.tips.map(t => `<li>${t}</li>`).join('')}
+        </ul>
       </div>
     </div>
   `).join('');
@@ -946,25 +1190,79 @@ function renderAIItinerary() {
 function renderBudgetEstimate(routeData) {
   const container = document.getElementById('budget-grid');
   const dist = routeData.distance;
-  const transportCost = Math.round(dist * 2.5);
-  const foodCost = state.currentStops.length * 150;
-  const sightCost = (state.currentStops.length - 2) * 100;
-  const total = transportCost + foodCost + sightCost;
-  
+  const numMidStops = Math.max(0, state.currentStops.length - 2);
+
+  // Cost breakdown
+  const transportCost = Math.round(dist * randBetween(10, 15)); // ₹10–15/km cab estimate
+  const foodCost = Math.round((numMidStops + 1) * randBetween(120, 200));
+  const sightCost = Math.round(numMidStops * randBetween(80, 150));
+  const miscCost = Math.round(dist * 0.5 + 50);  // parking, tolls etc.
+  const total = transportCost + foodCost + sightCost + miscCost;
+
+  // Budget limit (saved in state or default 2000)
+  if (!state.budgetLimit) state.budgetLimit = 2000;
+  const isOverBudget = total > state.budgetLimit;
+
   const items = [
-    { label: 'Transport Mode (Est)', val: `₹${transportCost.toLocaleString('en-IN')}` },
-    { label: 'Food & Drinks', val: `₹${foodCost.toLocaleString('en-IN')}` },
-    { label: 'Sightseeing & Entry', val: `₹${sightCost.toLocaleString('en-IN')}` },
-    { label: 'Estimated Total', val: `₹${total.toLocaleString('en-IN')}` }
+    { label: 'Transport (Cab est.)', val: transportCost, icon: '🚕' },
+    { label: 'Food & Drinks', val: foodCost, icon: '🍽️' },
+    { label: 'Sightseeing & Entry', val: sightCost, icon: '🎟️' },
+    { label: 'Misc (Tolls, Parking)', val: miscCost, icon: '🅿️' }
   ];
-  
-  container.innerHTML = items.map(item => `
+
+  // Budget limit control
+  let limitHtml = `
+    <div id="budget-limit-row" style="grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(0,0,0,0.03);border-radius:10px;margin-bottom:4px;flex-wrap:wrap;">
+      <label for="budget-limit-input" style="font-size:0.85rem;font-weight:600;color:var(--gray-600);white-space:nowrap;">💰 My Budget Limit:</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-weight:700;color:var(--gray-700);">₹</span>
+        <input id="budget-limit-input" type="number" min="0" step="100" value="${state.budgetLimit}"
+          style="width:100px;padding:6px 10px;border:1.5px solid var(--gray-300);border-radius:6px;font-size:0.9rem;font-weight:600;"
+          onchange="updateBudgetLimit(this.value)" aria-label="Set budget limit in rupees" />
+      </div>
+      <span id="budget-limit-status" style="font-size:0.82rem;padding:4px 12px;border-radius:20px;font-weight:700;
+        background:${isOverBudget ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)'};
+        color:${isOverBudget ? '#DC2626' : '#059669'};">
+        ${isOverBudget ? '⚠️ Over budget by ₹' + (total - state.budgetLimit).toLocaleString('en-IN') : '✅ Within budget'}
+      </span>
+    </div>
+  `;
+
+  // If over budget show a warning banner
+  let warningHtml = '';
+  if (isOverBudget) {
+    warningHtml = `
+      <div style="grid-column:1/-1;padding:12px 16px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:10px;">
+        <p style="margin:0;font-size:0.85rem;color:#B91C1C;font-weight:600;">⚠️ Your estimated trip cost (₹${total.toLocaleString('en-IN')}) exceeds your budget limit (₹${state.budgetLimit.toLocaleString('en-IN')}).</p>
+        <p style="margin:4px 0 0;font-size:0.78rem;color:var(--gray-500);">Consider removing optional stops, switching to a bus or metro, or adjusting your limit above.</p>
+      </div>
+    `;
+  }
+
+  const itemsHtml = items.map(item => `
     <div class="budget-item">
-      <div class="budget-val">${item.val}</div>
-      <div class="budget-label">${item.label}</div>
+      <div class="budget-val">₹${item.val.toLocaleString('en-IN')}</div>
+      <div class="budget-label">${item.icon} ${item.label}</div>
     </div>
   `).join('');
+
+  const totalHtml = `
+    <div class="budget-item" style="grid-column:1/-1;background:${isOverBudget ? 'rgba(239,68,68,0.08)' : 'rgba(15,155,142,0.08)'};
+      border:1.5px solid ${isOverBudget ? 'rgba(239,68,68,0.3)' : 'var(--teal)'}40;border-radius:12px;">
+      <div class="budget-val" style="color:${isOverBudget ? '#DC2626' : 'var(--teal)'};font-size:1.5rem;">₹${total.toLocaleString('en-IN')}</div>
+      <div class="budget-label" style="font-weight:700;">🧾 Estimated Total</div>
+      <div style="font-size:0.72rem;color:var(--gray-400);margin-top:4px;">Sample estimates. Actual costs may vary.</div>
+    </div>
+  `;
+
+  container.innerHTML = limitHtml + warningHtml + itemsHtml + totalHtml;
 }
+
+window.updateBudgetLimit = function(val) {
+  state.budgetLimit = parseInt(val) || 0;
+  const routeData = getRouteData(state.fromCity, state.toCity);
+  renderBudgetEstimate(routeData);
+};
 
 function renderWeatherInfo() {
   document.getElementById('weather-city').textContent = state.toCity;

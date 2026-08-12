@@ -13,6 +13,9 @@
 </head>
 <body>
 
+  <!-- ═══════════════════════════ PROTOTYPE BANNER ═══════════════════════════ -->
+  <div class="prototype-banner">Prototype — sample data for demonstration.</div>
+
   <!-- ═══════════════════════════ NAVBAR ═══════════════════════════ -->
   <header class="navbar" id="navbar">
     <div class="nav-container">
@@ -21,18 +24,16 @@
       </a>
 
       <nav class="nav-links" id="nav-links" aria-label="Main navigation">
-        <a href="#hero" class="nav-link" data-section="hero">Home</a>
-        <a href="#journey-section" class="nav-link" data-section="journey">Plan Journey</a>
+        <a href="#hero" class="nav-link active" data-section="hero">Home</a>
         <a href="#explore-section" class="nav-link" data-section="explore">Explore</a>
-        <a href="#compare-section" class="nav-link" data-section="compare">Compare</a>
-        <a href="#safety-section" class="nav-link" data-section="safety">Safety</a>
-        <a href="#about-section" class="nav-link" data-section="about">About</a>
+        <a href="#journey-section" class="nav-link" data-section="journey">Plan Journey</a>
+        <button class="nav-link" id="btn-nav-mytrips" aria-label="View saved journeys" style="background:none;border:none;font:inherit;cursor:pointer;">My Trips</button>
       </nav>
 
       <div class="nav-actions">
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark/light mode">☀️</button>
         <button class="btn-login" id="btn-open-login" aria-label="Login to your account">Login</button>
-        <button class="btn-signup" id="btn-open-signup" aria-label="Create an account">Sign Up</button>
+        <a href="#hero" class="btn-plan-cta" id="btn-nav-plan-cta" aria-label="Scroll to planning section">Plan My Journey</a>
         <button class="hamburger" id="hamburger" aria-label="Toggle mobile menu" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
@@ -41,15 +42,12 @@
     <!-- Mobile nav drawer -->
     <div class="mobile-nav" id="mobile-nav" aria-hidden="true">
       <a href="#hero" class="mobile-nav-link">🏠 Home</a>
-      <a href="#journey-section" class="mobile-nav-link">🗺️ Plan Journey</a>
       <a href="#explore-section" class="mobile-nav-link">🌏 Explore India</a>
-      <a href="#compare-section" class="mobile-nav-link">🔎 Compare</a>
-      <a href="#safety-section" class="mobile-nav-link">🛡️ Safety</a>
-      <a href="#about-section" class="mobile-nav-link">ℹ️ About</a>
+      <a href="#journey-section" class="mobile-nav-link">🗺️ Plan Journey</a>
+      <button class="mobile-nav-link" id="btn-mobile-mytrips" style="background:none;border:none;font:inherit;cursor:pointer;text-align:left;width:100%;">❤️ My Trips</button>
       <div class="mobile-nav-actions">
         <button class="theme-toggle" id="theme-toggle-mobile" aria-label="Toggle dark/light mode" style="width:100%; border-radius:var(--radius-sm); margin-bottom:12px; display:flex; justify-content:center; gap:8px;">☀️ Theme Mode</button>
-        <button class="btn-login" id="btn-mobile-login">Login</button>
-        <button class="btn-signup" id="btn-mobile-signup">Sign Up</button>
+        <button class="btn-login" id="btn-mobile-login" style="width:100%; text-align:center; display:block; margin-bottom:8px;">Login</button>
       </div>
     </div>
   </header>
@@ -134,10 +132,12 @@
       <div class="container">
 
         <!-- Loading State -->
-        <div class="journey-loading" id="journey-loading" style="display:none;">
+        <div class="journey-loading" id="journey-loading" style="display:none; flex-direction:column; align-items:center; gap:20px;">
           <div class="loading-spinner"></div>
-          <p class="loading-text">Finding best routes for you…</p>
-          <p class="loading-sub">Comparing fares across all providers</p>
+          <p class="loading-text" style="font-family:'Poppins', sans-serif; font-size:1.3rem; font-weight:700; color:var(--color-primary); margin-bottom:8px;">Analyzing your journey...</p>
+          <div class="loading-steps" id="loading-steps" style="display:flex; flex-direction:column; align-items:flex-start; gap:8px; font-weight:500; font-size:0.95rem; color:var(--color-muted); max-width:280px; width:100%; text-align:left;">
+            <!-- Filled dynamically by JS -->
+          </div>
         </div>
 
         <!-- Results Panel -->
@@ -210,6 +210,10 @@
               <button class="mode-btn" data-mode="bus" aria-pressed="false">
                 <span class="mode-icon">🚌</span>
                 <span class="mode-name">Bus</span>
+              </button>
+              <button class="mode-btn" data-mode="metro" aria-pressed="false">
+                <span class="mode-icon">🚇</span>
+                <span class="mode-name">Metro</span>
               </button>
             </div>
           </div>

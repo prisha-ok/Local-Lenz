@@ -6,26 +6,50 @@
 
 /* ── Reset & Base ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
 
 :root {
-  --blue-dark:   #243B53;  /* Navy */
-  --blue-mid:    #334E68;  /* Navy Light */
-  --teal:        #E88770;  /* Coral */
-  --teal-light:  #F5C6B5;  /* Soft Peach */
-  --saffron:     #E88770;  /* Coral */
-  --saffron-lite:#FFF5E8;  /* Cream */
-  --red-em:      #EF4444;
-  --green:       #10B981;
+  /* Semantic Brand Palette */
+  --color-primary:    #243B53;  /* Navy */
+  --color-secondary:  #B9DFF2;  /* Baby Blue */
+  --color-accent:     #E88770;  /* Coral */
+  --color-background: #F8FAFC;  /* Light background */
+  --color-surface:    #FFFFFF;  /* White card surfaces */
+  --color-cream:      #FFF5E8;  /* Cream surfaces */
+  --color-peach:      #F5C6B5;  /* Soft Peach highlights */
+  --color-text:       #243B53;  /* Main text */
+  --color-muted:      #64748B;  /* Muted text */
+  --color-border:     var(--color-secondary);
+  --color-success:    #10B981;  /* Green success */
+  --color-warning:    #F5C6B5;  /* Peach warning */
+  --color-error:      #EF4444;  /* Red error */
+
+  /* Legacy variable mappings (maintains compatibility with existing selectors) */
+  --blue-dark:   var(--color-primary);
+  --blue-mid:    #334E68;
+  --teal:        var(--color-accent);
+  --teal-light:  var(--color-peach);
+  --saffron:     var(--color-accent);
+  --saffron-lite:var(--color-cream);
+  --red-em:      var(--color-error);
+  --green:       var(--color-success);
   --purple:      #8B5CF6;
-  --white:       #FFFFFF;
-  --off-white:   #F8FAFC;  /* Background color code */
-  --gray-50:     #FFF5E8;  /* Cream background alert/stop */
-  --gray-100:    #B9DFF2;  /* Baby Blue for accents */
+  --white:       var(--color-surface);
+  --off-white:   var(--color-background);
+  --gray-50:     var(--color-cream);
+  --gray-100:    var(--color-secondary);
   --gray-300:    #CBD5E1;
-  --gray-500:    #64748B;
+  --gray-500:    var(--color-muted);
   --gray-700:    #334155;
-  --gray-900:    #243B53;  /* Navy for dark text */
+  --gray-900:    var(--color-primary);
   --nav-bg:      rgba(255, 255, 255, 0.95);
+  --footer-bg:   #152232;  /* static dark navy */
+  --card-border: var(--color-secondary);
+
+  /* Shadows, radii, transitions */
   --shadow-sm:   0 1px 3px rgba(36,59,83,.08), 0 1px 2px rgba(36,59,83,.05);
   --shadow-md:   0 4px 16px rgba(36,59,83,.10);
   --shadow-lg:   0 10px 40px rgba(36,59,83,.15);
@@ -35,31 +59,44 @@
   --radius-lg:   24px;
   --radius-xl:   32px;
   --transition:  0.3s cubic-bezier(.4,0,.2,1);
-  --footer-bg:   #152232;  /* Always dark navy – doesn't flip */
-  --card-border: #B9DFF2;  /* Baby Blue border */
 }
 
 [data-theme="dark"] {
-  --blue-dark:   #F8FAFC;  /* Flip primary text to light background */
-  --blue-mid:    #B9DFF2;  /* Baby Blue */
-  --teal:        #E88770;  /* Coral */
-  --teal-light:  #F5C6B5;  /* Soft Peach */
-  --saffron:     #E88770;
+  --color-primary:    #F8FAFC;  /* Light text */
+  --color-secondary:  #B9DFF2;  /* Baby Blue details */
+  --color-accent:     #E88770;  /* Coral accent */
+  --color-background: #0F1924;  /* Deep dark navy page background */
+  --color-surface:    #1E2E3F;  /* Dark card surface */
+  --color-cream:      #243B53;  /* Darker Navy fallback */
+  --color-peach:      #F5C6B5;
+  --color-text:       #F8FAFC;
+  --color-muted:      #CBD5E1;
+  --color-border:     #2C4660;
+  --color-success:    #34D399;
+  --color-warning:    #F5C6B5;
+  --color-error:      #F87171;
+
+  /* Legacy variable mappings (dark overrides) */
+  --blue-dark:   var(--color-primary);
+  --blue-mid:    var(--color-secondary);
+  --teal:        var(--color-accent);
+  --teal-light:  var(--color-peach);
+  --saffron:     var(--color-accent);
   --saffron-lite:#243B53;
-  --red-em:      #F87171;
-  --green:       #34D399;
+  --red-em:      var(--color-error);
+  --green:       var(--color-success);
   --purple:      #A78BFA;
-  --white:       #1E2E3F;  /* Dark card background using Navy family */
-  --off-white:   #0F1924;  /* Deep dark navy page background */
-  --gray-50:     #172431;  /* Dark background alerts */
-  --gray-100:    #2C4660;  /* Dark slate border lines */
+  --white:       var(--color-surface);
+  --off-white:   var(--color-background);
+  --gray-50:     #172431;
+  --gray-100:    var(--color-border);
   --gray-300:    #486581;
-  --gray-500:    #B9DFF2;  /* Baby Blue for subtitles */
-  --gray-700:    #CBD5E1;  /* Light text */
-  --gray-900:    #F8FAFC;  /* Heading text */
+  --gray-500:    var(--color-secondary);
+  --gray-700:    var(--color-muted);
+  --gray-900:    var(--color-text);
   --nav-bg:      rgba(30, 46, 63, 0.95);
-  --footer-bg:   #0A1520;  /* Even deeper navy in dark mode */
-  --card-border: #2C4660;
+  --footer-bg:   #0A1520;
+  --card-border: var(--color-border);
 }
 
 html { scroll-behavior: smooth; font-size: 16px; transition: background var(--transition); }
@@ -71,6 +108,46 @@ body {
   overflow-x: hidden;
   line-height: 1.6;
   transition: background var(--transition), color var(--transition);
+}
+
+/* Prototype Banner */
+.prototype-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 32px;
+  background: var(--color-primary);
+  color: var(--color-background);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  border-bottom: 1.5px solid var(--color-accent);
+}
+
+/* Plan CTA Button */
+.btn-plan-cta {
+  padding: 8px 18px;
+  background: var(--color-accent);
+  color: white;
+  border-radius: 50px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: all var(--transition);
+  box-shadow: 0 4px 12px rgba(232, 135, 112, 0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.btn-plan-cta:hover {
+  background: #e1745c;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(232, 135, 112, 0.35);
+  color: white !important;
 }
 
 /* ── Custom Theme Toggle & Logo ── */
@@ -130,11 +207,11 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
    NAVBAR
    ══════════════════════════════════════════════════════════════ */
 .navbar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  position: fixed; top: 32px; left: 0; right: 0; z-index: 1000;
   background: var(--nav-bg);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--gray-100);
-  transition: box-shadow var(--transition), background var(--transition);
+  transition: box-shadow var(--transition), background var(--transition), top var(--transition);
 }
 .navbar.scrolled { box-shadow: var(--shadow-md); background: var(--nav-bg); }
 
@@ -760,17 +837,26 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
 /* Itinerary */
 .itinerary-list { display: flex; flex-direction: column; gap: 12px; }
 .itinerary-item {
-  display: flex; gap: 16px; padding: 14px; background: var(--gray-50);
-  border-radius: var(--radius-sm); border-left: 4px solid var(--teal);
+  display: flex; gap: 16px; padding: 16px 14px; background: var(--gray-50);
+  border-radius: var(--radius-sm);
+  border-left: 4px solid var(--iti-accent, var(--teal));
+  transition: box-shadow 0.2s;
 }
-.iti-time { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--blue-dark); min-width: 70px; }
-.iti-detail h4 { font-family: 'Poppins', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--gray-900); }
+.itinerary-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+.iti-time {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 0.85rem;
+  color: var(--blue-dark); min-width: 62px; padding-top: 2px;
+}
+.iti-icon { font-size: 1.2rem; }
+.iti-detail h4 { font-family: 'Poppins', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--gray-900); margin-bottom: 0; }
 .iti-detail p { font-size: 0.82rem; color: var(--gray-500); margin-top: 2px; }
 
 /* Budget */
-.budget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+.budget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+.budget-grid > [style*="grid-column:1/-1"], .budget-grid > div[style*="grid-column: 1 / -1"] { grid-column: 1 / -1; }
 .budget-item { background: var(--gray-50); padding: 16px; border-radius: var(--radius); text-align: center; border: 1px solid var(--gray-100); }
-.budget-val { font-family: 'Poppins', sans-serif; font-size: 1.5rem; font-weight: 900; color: var(--blue-dark); }
+.budget-val { font-family: 'Poppins', sans-serif; font-size: 1.4rem; font-weight: 900; color: var(--blue-dark); }
 .budget-label { font-size: 0.78rem; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
 
 /* Weather */
