@@ -133,10 +133,12 @@ const state = {
   currentFilter: 'cheapest',
   currentCategory: 'all',
   currentStops: [],
+  budgetLimit: null,
+  restoreStopsList: null,        // temporary list of stops to restore when loading a saved route
   trustedContact: JSON.parse(localStorage.getItem('ll_trusted') || 'null'),
-  user: JSON.parse(localStorage.getItem('ll_user') || 'null'),
+  user: null,                    // set by Supabase onAuthStateChange in auth.js
   recentSearches: JSON.parse(localStorage.getItem('ll_recent') || '[]'),
-  savedJourneys: JSON.parse(localStorage.getItem('ll_saved') || '[]'),
+  savedJourneys: [],             // loaded from Supabase DB after authentication
 };
 
 
@@ -828,28 +830,59 @@ function initFilters() {
 }
 
 function initJourneySubsections(routeData) {
-  const routeKey = getRouteKey(state.fromCity, state.toCity);
-  const discoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
-  
-  state.currentStops = [
-    { name: state.fromCity, type: 'start', emoji: '📍', desc: 'Starting point of your journey' }
-  ];
-  
-  discoveryStops.slice(0, 2).forEach(s => {
-    state.currentStops.push({
-      name: s.name,
-      type: 'recommended',
-      emoji: s.emoji || '⭐',
-      desc: s.desc
+  if (state.restoreStopsList && state.restoreStopsList.length) {
+    // Reconstruct state.currentStops from the saved string array
+    state.currentStops = state.restoreStopsList.map((stopName, idx) => {
+      let type = 'user-added';
+      let emoji = '📍';
+      let desc = 'Saved stop along the route';
+      if (idx === 0) {
+        type = 'start';
+        emoji = '📍';
+        desc = 'Starting point of your journey';
+      } else if (idx === state.restoreStopsList.length - 1) {
+        type = 'dest';
+        emoji = '🏁';
+        desc = 'Destination point';
+      } else {
+        // Check if this was originally a recommended stop
+        const routeKey = getRouteKey(state.fromCity, state.toCity);
+        const discoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
+        const matchedRec = discoveryStops.find(ds => ds.name.toLowerCase() === stopName.toLowerCase());
+        if (matchedRec) {
+          type = 'recommended';
+          emoji = matchedRec.emoji || '⭐';
+          desc = matchedRec.desc;
+        }
+      }
+      return { name: stopName, type, emoji, desc };
     });
-  });
-  
-  state.currentStops.push({
-    name: state.toCity,
-    type: 'dest',
-    emoji: '🏁',
-    desc: 'Destination point'
-  });
+    // Clear restore list so subsequent searches start fresh
+    state.restoreStopsList = null;
+  } else {
+    const routeKey = getRouteKey(state.fromCity, state.toCity);
+    const discoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
+    
+    state.currentStops = [
+      { name: state.fromCity, type: 'start', emoji: '📍', desc: 'Starting point of your journey' }
+    ];
+    
+    discoveryStops.slice(0, 2).forEach(s => {
+      state.currentStops.push({
+        name: s.name,
+        type: 'recommended',
+        emoji: s.emoji || '⭐',
+        desc: s.desc
+      });
+    });
+    
+    state.currentStops.push({
+      name: state.toCity,
+      type: 'dest',
+      emoji: '🏁',
+      desc: 'Destination point'
+    });
+  }
   
   const addStopBtn = document.getElementById('btn-add-stop');
   const addStopRow = document.getElementById('add-stop-row');
@@ -922,14 +955,8 @@ function initJourneySubsections(routeData) {
       stops: state.currentStops.map(s => s.name),
       date: new Date().toLocaleDateString('en-IN')
     };
-    if (!state.savedJourneys.some(s => s.from === trip.from && s.to === trip.to)) {
-      state.savedJourneys.push(trip);
-      localStorage.setItem('ll_saved', JSON.stringify(state.savedJourneys));
-      showToast('❤️ Trip saved to your account!', 'success');
-      renderDashboardLists();
-    } else {
-      showToast('Trip is already saved!', 'info');
-    }
+    // Persist to Supabase (auth.js). Falls back gracefully if not logged in.
+    saveJourneyToDB(trip);
   };
   
   renderAllSubsections(routeData);
@@ -1444,6 +1471,7 @@ function initSafety() {
 
 /* ════════════════════════════════════════════════════════════════
    AUTH MODAL
+   Wired to Supabase (auth.js). Form validation remains identical.
    ════════════════════════════════════════════════════════════════ */
 function initAuth() {
   const modal = document.getElementById('auth-modal');
@@ -1476,6 +1504,11 @@ function initAuth() {
   document.getElementById('btn-mobile-signup').addEventListener('click', () => openModal('signup'));
   modalClose.addEventListener('click', closeModal);
   modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // My Trips link in nav
+  document.getElementById('btn-nav-mytrips')?.addEventListener('click', () => openModal('login'));
+  document.getElementById('btn-mobile-mytrips')?.addEventListener('click', () => openModal('login'));
 
   // Toggle between forms
   document.getElementById('switch-to-signup').addEventListener('click', () => {
@@ -1485,58 +1518,65 @@ function initAuth() {
     signupForm.style.display = 'none'; loginForm.style.display = 'block';
   });
 
-  // Login submit
-  document.getElementById('login-form-el').addEventListener('submit', e => {
+  // ── LOGIN SUBMIT → Supabase signInWithPassword ─────────────────
+  document.getElementById('login-form-el').addEventListener('submit', async e => {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
     const pw = document.getElementById('login-password').value;
     let valid = true;
-    if (!email) { document.getElementById('login-email-err').textContent = 'Email or phone is required'; valid = false; }
-    else document.getElementById('login-email-err').textContent = '';
-    if (pw.length < 4) { document.getElementById('login-pw-err').textContent = 'Password must be at least 4 characters'; valid = false; }
-    else document.getElementById('login-pw-err').textContent = '';
+    if (!email) {
+      document.getElementById('login-email-err').textContent = 'Email is required';
+      valid = false;
+    } else {
+      document.getElementById('login-email-err').textContent = '';
+    }
+    if (pw.length < 6) {
+      document.getElementById('login-pw-err').textContent = 'Password must be at least 6 characters';
+      valid = false;
+    } else {
+      document.getElementById('login-pw-err').textContent = '';
+    }
     if (!valid) return;
-
-    // Simulated auth — in production use Firebase Auth / Supabase / JWT
-    state.user = { name: email.split('@')[0] || email, email };
-    localStorage.setItem('ll_user', JSON.stringify(state.user));
-    updateNavForUser();
-    showDashboard();
-    showToast(`Welcome back, ${state.user.name}! 👋`, 'success');
+    await authSignIn(email, pw);
   });
 
-  // Signup submit
-  document.getElementById('signup-form-el').addEventListener('submit', e => {
+  // ── SIGNUP SUBMIT → Supabase signUp + profile insert ────────────
+  document.getElementById('signup-form-el').addEventListener('submit', async e => {
     e.preventDefault();
     const name = document.getElementById('signup-name').value.trim();
     const email = document.getElementById('signup-email').value.trim();
+    const phone = document.getElementById('signup-phone')?.value.trim() || '';
     const pw = document.getElementById('signup-password').value;
     let valid = true;
-    if (!name) { document.getElementById('signup-name-err').textContent = 'Name is required'; valid = false; }
-    else document.getElementById('signup-name-err').textContent = '';
-    if (!email || !email.includes('@')) { document.getElementById('signup-email-err').textContent = 'Valid email required'; valid = false; }
-    else document.getElementById('signup-email-err').textContent = '';
-    if (pw.length < 6) { document.getElementById('signup-pw-err').textContent = 'Password must be at least 6 characters'; valid = false; }
-    else document.getElementById('signup-pw-err').textContent = '';
+    if (!name) {
+      document.getElementById('signup-name-err').textContent = 'Name is required';
+      valid = false;
+    } else {
+      document.getElementById('signup-name-err').textContent = '';
+    }
+    if (!email || !email.includes('@')) {
+      document.getElementById('signup-email-err').textContent = 'Valid email required';
+      valid = false;
+    } else {
+      document.getElementById('signup-email-err').textContent = '';
+    }
+    if (pw.length < 6) {
+      document.getElementById('signup-pw-err').textContent = 'Password must be at least 6 characters';
+      valid = false;
+    } else {
+      document.getElementById('signup-pw-err').textContent = '';
+    }
     if (!valid) return;
-
-    state.user = { name, email };
-    localStorage.setItem('ll_user', JSON.stringify(state.user));
-    updateNavForUser();
-    showDashboard();
-    showToast(`Welcome to Local Lenz, ${name}! 🎉`, 'success');
+    await authSignUp(name, email, phone, pw);
   });
 
-  // Logout
+  // ── LOGOUT → Supabase signOut ────────────────────────────────────
   document.getElementById('btn-logout').addEventListener('click', () => {
-    state.user = null;
-    localStorage.removeItem('ll_user');
-    updateNavForUser();
+    authSignOut();
     closeModal();
-    showToast('Logged out successfully', 'info');
   });
 
-  // Password toggle
+  // Password visibility toggle (unchanged)
   document.querySelectorAll('.toggle-pw').forEach(btn => {
     btn.addEventListener('click', () => {
       const input = document.getElementById(btn.dataset.target);
@@ -1544,9 +1584,6 @@ function initAuth() {
       btn.textContent = input.type === 'password' ? '👁' : '🙈';
     });
   });
-
-  // Init user state
-  if (state.user) updateNavForUser();
 }
 
 function showDashboard() {
@@ -1560,32 +1597,70 @@ function showDashboard() {
 function renderDashboardLists() {
   const recentEl = document.getElementById('recent-list');
   if (state.recentSearches.length) {
-    recentEl.innerHTML = state.recentSearches.slice(0, 4).map(r =>
-      `<div class="journey-item"><span class="journey-item-icon">🗺️</span>${r.from} → ${r.to}</div>`
-    ).join('');
+    recentEl.innerHTML = state.recentSearches.slice(0, 4).map(r => {
+      return `
+        <div class="journey-item" onclick="loadSavedJourney('${r.from.replace(/'/g, "\\'")}', '${r.to.replace(/'/g, "\\'")}', '[]')">
+          <span class="journey-item-icon">🗺️</span>
+          <span>${r.from} → ${r.to}</span>
+        </div>
+      `;
+    }).join('');
   } else {
     recentEl.innerHTML = '<p class="empty-state">No recent journeys yet</p>';
   }
 
   const savedEl = document.getElementById('saved-list');
   if (state.savedJourneys.length) {
-    savedEl.innerHTML = state.savedJourneys.slice(0, 4).map(s =>
-      `<div class="journey-item"><span class="journey-item-icon">❤️</span>${s.from} → ${s.to}</div>`
-    ).join('');
+    savedEl.innerHTML = state.savedJourneys.slice(0, 4).map(s => {
+      const stopsEscaped = JSON.stringify(s.stops).replace(/"/g, '&quot;');
+      return `
+        <div class="journey-item" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <div onclick="loadSavedJourney('${s.from.replace(/'/g, "\\'")}', '${s.to.replace(/'/g, "\\'")}', '${stopsEscaped}')" style="display:flex; align-items:center; gap:8px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            <span class="journey-item-icon">❤️</span>
+            <span style="overflow:hidden; text-overflow:ellipsis;">${s.from} → ${s.to}</span>
+          </div>
+          <button onclick="event.stopPropagation(); deleteJourneyFromDB('${s.dbId}')" class="btn-delete-saved" aria-label="Delete saved journey" style="background:none; border:none; color:var(--red-em); font-size:1.1rem; cursor:pointer; padding: 2px 6px; display:flex; align-items:center; justify-content:center;">✕</button>
+        </div>
+      `;
+    }).join('');
   } else {
     savedEl.innerHTML = '<p class="empty-state">No saved journeys yet</p>';
   }
 }
 
+// ── Global Helper for dashboard links ──
+window.loadSavedJourney = function(from, to, stopsJsonStr) {
+  try {
+    state.restoreStopsList = JSON.parse(stopsJsonStr);
+  } catch (e) {
+    state.restoreStopsList = null;
+  }
+  document.getElementById('input-from').value = from;
+  document.getElementById('input-to').value = to;
+  
+  // Close modal if open
+  const modal = document.getElementById('auth-modal');
+  if (modal) modal.style.display = 'none';
+  
+  // Run search
+  triggerSearch();
+};
+
 function updateNavForUser() {
   const loginBtn = document.getElementById('btn-open-login');
   const signupBtn = document.getElementById('btn-open-signup');
+  const mobileLoginBtn = document.getElementById('btn-mobile-login');
+  const mobileSignupBtn = document.getElementById('btn-mobile-signup');
   if (state.user) {
-    loginBtn.textContent = `👤 ${state.user.name}`;
-    signupBtn.textContent = 'My Trips';
+    if (loginBtn) loginBtn.textContent = `👤 ${state.user.name}`;
+    if (signupBtn) signupBtn.textContent = 'My Trips';
+    if (mobileLoginBtn) mobileLoginBtn.textContent = `👤 ${state.user.name}`;
+    if (mobileSignupBtn) mobileSignupBtn.textContent = '❤️ My Trips';
   } else {
-    loginBtn.textContent = 'Login';
-    signupBtn.textContent = 'Sign Up';
+    if (loginBtn) loginBtn.textContent = 'Login';
+    if (signupBtn) signupBtn.textContent = 'Sign Up';
+    if (mobileLoginBtn) mobileLoginBtn.textContent = 'Login';
+    if (mobileSignupBtn) mobileSignupBtn.textContent = 'Sign Up';
   }
 }
 
@@ -1670,6 +1745,7 @@ function initThemeToggle() {
    BOOT
    ════════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
+  initSupabase();        // ← Supabase: must run first to restore session
   initThemeToggle();
   initNavbar();
   initParticles();
