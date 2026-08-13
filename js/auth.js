@@ -35,6 +35,9 @@ function initSupabase() {
     }
   });
 
+  // Expose client globally so app.js can access session tokens for API auth headers
+  window._supabaseClient = supabaseClient;
+
   // ── Session restore on page load + real-time auth state listener ──
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session && session.user) {
@@ -169,26 +172,30 @@ async function authSignOut() {
 async function loadSavedJourneys() {
   if (!supabaseClient || !state.user) return;
   try {
-    const { data, error } = await supabaseClient
-      .from('saved_journeys')
-      .select('id, from_city, to_city, stops, saved_at')
-      .eq('user_id', state.user.id)
-      .order('saved_at', { ascending: false });
+    const sessionRes = await supabaseClient.auth.getSession();
+    const token = sessionRes.data.session?.access_token;
 
-    if (error) throw error;
+    const res = await fetch('/api/journeys', {
+      headers: {
+        'Authorization': `Bearer ${token || ''}`
+      }
+    });
+
+    if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+    const data = await res.json();
 
     state.savedJourneys = (data || []).map(row => ({
       dbId: row.id,
       from: row.from_city,
       to: row.to_city,
       stops: row.stops || [],
-      date: new Date(row.saved_at).toLocaleDateString('en-IN')
+      date: new Date(row.saved_at || row.created_at).toLocaleDateString('en-IN')
     }));
 
     // Refresh dashboard lists if dashboard is visible
     if (typeof renderDashboardLists === 'function') renderDashboardLists();
   } catch (err) {
-    console.error('Error loading saved journeys:', err);
+    console.error('Error loading saved journeys from backend:', err);
   }
 }
 
@@ -208,21 +215,25 @@ async function saveJourneyToDB(trip) {
     return;
   }
 
-  if (!supabaseClient) { showToast('Database not connected', 'error'); return; }
-
   try {
-    const { data, error } = await supabaseClient
-      .from('saved_journeys')
-      .insert({
-        user_id: state.user.id,
+    const sessionRes = await supabaseClient.auth.getSession();
+    const token = sessionRes.data.session?.access_token;
+
+    const res = await fetch('/api/journeys', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token || ''}`
+      },
+      body: JSON.stringify({
         from_city: trip.from,
         to_city: trip.to,
         stops: trip.stops || []
       })
-      .select('id, saved_at')
-      .single();
+    });
 
-    if (error) throw error;
+    if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+    const data = await res.json();
 
     // Update local state immediately
     state.savedJourneys.unshift({
@@ -230,7 +241,7 @@ async function saveJourneyToDB(trip) {
       from: trip.from,
       to: trip.to,
       stops: trip.stops,
-      date: new Date(data.saved_at).toLocaleDateString('en-IN')
+      date: new Date(data.saved_at || data.created_at).toLocaleDateString('en-IN')
     });
 
     showToast('❤️ Trip saved to your account!', 'success');
@@ -244,15 +255,19 @@ async function saveJourneyToDB(trip) {
 
 /* ─── DELETE SAVED JOURNEY ──────────────────────────────────────── */
 async function deleteJourneyFromDB(dbId) {
-  if (!supabaseClient || !state.user) return;
+  if (!state.user) return;
   try {
-    const { error } = await supabaseClient
-      .from('saved_journeys')
-      .delete()
-      .eq('id', dbId)
-      .eq('user_id', state.user.id);   // RLS ensures this, but belt+suspenders
+    const sessionRes = await supabaseClient.auth.getSession();
+    const token = sessionRes.data.session?.access_token;
 
-    if (error) throw error;
+    const res = await fetch(`/api/journeys/${dbId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token || ''}`
+      }
+    });
+
+    if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
 
     state.savedJourneys = state.savedJourneys.filter(s => s.dbId !== dbId);
     showToast('Journey removed.', 'info');

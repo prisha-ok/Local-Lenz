@@ -129,6 +129,8 @@ const DISCOVERY_STOPS = {
 const state = {
   fromCity: '',
   toCity: '',
+  fromCoords: null,              // { lat, lon } — set by autocomplete selection or geolocation
+  toCoords: null,                // { lat, lon } — set by autocomplete selection
   currentMode: 'all',
   currentFilter: 'cheapest',
   currentCategory: 'all',
@@ -139,6 +141,7 @@ const state = {
   user: null,                    // set by Supabase onAuthStateChange in auth.js
   recentSearches: JSON.parse(localStorage.getItem('ll_recent') || '[]'),
   savedJourneys: [],             // loaded from Supabase DB after authentication
+  apiData: null,                 // stores the real journey API response { distance, duration, weather, stops, safety }
 };
 
 
@@ -274,41 +277,81 @@ function initAutocomplete() {
   });
 }
 
+let autocompleteDebounceTimer = null;
+
 function setupAutocomplete(inputId, dropdownId, stateKey) {
   const input = document.getElementById(inputId);
   const dropdown = document.getElementById(dropdownId);
 
   input.addEventListener('input', () => {
-    const val = input.value.trim().toLowerCase();
-    if (val.length < 1) { closeDropdown(dropdown); return; }
-    const matches = INDIAN_CITIES.filter(c => c.toLowerCase().startsWith(val)).slice(0, 6);
-    if (!matches.length) { closeDropdown(dropdown); return; }
-    dropdown.innerHTML = matches.map(c =>
-      `<div class="ac-item" tabindex="0" role="option">
-         <span class="ac-icon">📍</span>${c}
-       </div>`
-    ).join('');
-    dropdown.classList.add('open');
-    dropdown.querySelectorAll('.ac-item').forEach(item => {
-      item.addEventListener('click', () => {
-        input.value = item.textContent.trim();
-        state[stateKey] = item.textContent.trim();
-        closeDropdown(dropdown);
-      });
-      item.addEventListener('keydown', e => {
-        if (e.key === 'Enter') item.click();
-      });
-    });
+    const val = input.value.trim();
+    if (val.length < 2) { closeDropdown(dropdown); return; }
+
+    clearTimeout(autocompleteDebounceTimer);
+    autocompleteDebounceTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(val)}`);
+        if (!res.ok) throw new Error('Geocoding search failed');
+        const matches = await res.json();
+        
+        if (!matches || !matches.length) { closeDropdown(dropdown); return; }
+        
+        dropdown.innerHTML = matches.map(item =>
+          `<div class="ac-item" tabindex="0" role="option" data-name="${item.name.replace(/'/g, "\\'")}" data-lat="${item.lat}" data-lon="${item.lon}">
+             <span class="ac-icon">📍</span>
+             <div style="display:flex; flex-direction:column; text-align:left;">
+               <span style="font-weight:600; font-size:13px; color:var(--gray-900); line-height:1.2;">${item.name}</span>
+               <span style="font-size:10px; color:var(--gray-400); margin-top:2px;">${item.fullName}</span>
+             </div>
+           </div>`
+        ).join('');
+        
+        dropdown.classList.add('open');
+        dropdown.querySelectorAll('.ac-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const name = item.dataset.name;
+            input.value = name;
+            state[stateKey] = name;
+            
+            // Store coordinates in state
+            const coordKey = stateKey === 'fromCity' ? 'fromCoords' : 'toCoords';
+            state[coordKey] = {
+              lat: parseFloat(item.dataset.lat),
+              lon: parseFloat(item.dataset.lon)
+            };
+            
+            closeDropdown(dropdown);
+          });
+          item.addEventListener('keydown', e => {
+            if (e.key === 'Enter') item.click();
+          });
+        });
+      } catch (err) {
+        console.error('Autocomplete query failed:', err.message);
+      }
+    }, 300); // 300ms debounce
   });
 
   document.addEventListener('click', e => {
     if (!input.contains(e.target) && !dropdown.contains(e.target)) closeDropdown(dropdown);
   });
 
-  input.addEventListener('change', () => { state[stateKey] = input.value.trim(); });
+  input.addEventListener('change', () => {
+    state[stateKey] = input.value.trim();
+    // Invalidate stale coordinates if user manually changes text
+    if (state[stateKey] !== input.value.trim()) {
+      const coordKey = stateKey === 'fromCity' ? 'fromCoords' : 'toCoords';
+      state[coordKey] = null;
+    }
+  });
 }
 
-function closeDropdown(el) { el.innerHTML = ''; el.classList.remove('open'); }
+function closeDropdown(el) {
+  if (el) {
+    el.innerHTML = '';
+    el.classList.remove('open');
+  }
+}
 
 /* ════════════════════════════════════════════════════════════════
    GEOLOCATION
@@ -321,11 +364,27 @@ function initGeolocation() {
     }
     showToast('Detecting your location…', 'info');
     navigator.geolocation.getCurrentPosition(
-      () => {
-        // In production: reverse geocode with Google Maps API
-        document.getElementById('input-from').value = 'Your Current Location';
-        state.fromCity = 'Delhi'; // Mock — replace with real reverse geocode
-        showToast('📍 Location detected! (Mock: using Delhi)', 'success');
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+          if (!res.ok) throw new Error('Reverse geocoding failed');
+          const data = await res.json();
+          const address = data.address || {};
+          const cityName = address.city || address.town || address.village || address.suburb || 'My Location';
+          
+          document.getElementById('input-from').value = cityName;
+          state.fromCity = cityName;
+          state.fromCoords = { lat, lon };
+          showToast(`📍 Location detected: ${cityName}`, 'success');
+        } catch (e) {
+          const coordStr = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+          document.getElementById('input-from').value = coordStr;
+          state.fromCity = coordStr;
+          state.fromCoords = { lat, lon };
+          showToast(`📍 Location coordinates: ${coordStr}`, 'success');
+        }
       },
       () => { showToast('Could not access location. Please allow permissions.', 'error'); }
     );
@@ -345,7 +404,7 @@ function initSearch() {
   });
 }
 
-function triggerSearch() {
+async function triggerSearch() {
   const fromVal = document.getElementById('input-from').value.trim();
   const toVal = document.getElementById('input-to').value.trim();
 
@@ -367,39 +426,91 @@ function triggerSearch() {
   state.fromCity = fromVal;
   state.toCity = toVal;
 
-  // Save to recent
+  // Save to recent searches
   saveRecentSearch(fromVal, toVal);
 
   // Smooth scroll to results
   document.getElementById('journey-section').scrollIntoView({ behavior: 'smooth' });
 
   showLoading();
-  
+
   const loadingStepsContainer = document.getElementById('loading-steps');
   const stepsText = [
-    "Checking route",
-    "Comparing transportation",
-    "Discovering places",
-    "Preparing itinerary",
-    "Estimating budget"
+    'Geocoding locations',
+    'Calculating route',
+    'Checking weather',
+    'Discovering places',
+    'Preparing results'
   ];
-  
-  loadingStepsContainer.innerHTML = "";
-  
+  loadingStepsContainer.innerHTML = '';
   stepsText.forEach((step, idx) => {
     setTimeout(() => {
       const stepEl = document.createElement('div');
-      stepEl.className = "loading-step-item fade-in-up";
-      stepEl.style.cssText = "display:flex; align-items:center; gap:8px; animation: fadeInUp 0.3s ease forwards;";
+      stepEl.className = 'loading-step-item fade-in-up';
+      stepEl.style.cssText = 'display:flex; align-items:center; gap:8px; animation: fadeInUp 0.3s ease forwards;';
       stepEl.innerHTML = `<span style="color:var(--color-accent); font-weight:bold;">✓</span> <span>${step}</span>`;
       loadingStepsContainer.appendChild(stepEl);
-    }, (idx + 1) * 300);
+    }, (idx + 1) * 280);
   });
 
-  setTimeout(() => {
+  try {
+    // 1. Ensure we have coordinates for both cities
+    // Use stored coords from autocomplete dropdown if available, otherwise geocode now
+    if (!state.fromCoords) {
+      const fromResults = await fetch(`/api/geocode?q=${encodeURIComponent(fromVal)}`).then(r => r.json()).catch(() => []);
+      if (fromResults && fromResults.length) {
+        state.fromCoords = { lat: fromResults[0].lat, lon: fromResults[0].lon };
+      }
+    }
+    if (!state.toCoords) {
+      const toResults = await fetch(`/api/geocode?q=${encodeURIComponent(toVal)}`).then(r => r.json()).catch(() => []);
+      if (toResults && toResults.length) {
+        state.toCoords = { lat: toResults[0].lat, lon: toResults[0].lon };
+      }
+    }
+
+    // 2. Call the real journey API if we have coordinates
+    let apiData = null;
+    if (state.fromCoords && state.toCoords) {
+      const params = new URLSearchParams({
+        fromLat: state.fromCoords.lat,
+        fromLon: state.fromCoords.lon,
+        toLat: state.toCoords.lat,
+        toLon: state.toCoords.lon
+      });
+      const journeyRes = await fetch(`/api/journey?${params}`);
+      if (journeyRes.ok) {
+        apiData = await journeyRes.json();
+      } else {
+        console.warn('Journey API returned non-OK:', journeyRes.status);
+      }
+    } else {
+      console.warn('Could not geocode one or both cities — falling back to mock data.');
+    }
+
+    state.apiData = apiData;
+
+    // 3. Log search to DB (fire and forget — does not block UI)
+    if (state.user) {
+      const token = (await window._supabaseClient?.auth?.getSession())?.data?.session?.access_token;
+      if (token) {
+        fetch('/api/search-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ origin: fromVal, destination: toVal })
+        }).catch(() => {}); // non-blocking
+      }
+    }
+
     hideLoading();
     renderResults();
-  }, 1900); // 1.9 seconds total
+  } catch (err) {
+    console.error('triggerSearch failed:', err.message);
+    state.apiData = null;
+    hideLoading();
+    renderResults(); // graceful fallback to mock data
+    showToast('⚠️ Live data unavailable — showing estimates', 'error', 4000);
+  }
 }
 
 function showLoading() {
@@ -421,12 +532,29 @@ function renderResults() {
   const resultsEl = document.getElementById('journey-results');
   resultsEl.style.display = 'block';
 
-  const routeData = getRouteData(state.fromCity, state.toCity);
+  // Build a routeData object from real API data if available, or fallback to mock
+  let routeData;
+  if (state.apiData) {
+    const apiDistKm = state.apiData.distance;
+    const apiDurMin = state.apiData.duration;
+    // Merge real data with mock ROUTE_DATA fallback structure
+    const mockFallback = getRouteData(state.fromCity, state.toCity);
+    routeData = {
+      distance: apiDistKm || mockFallback.distance,
+      duration_road: apiDurMin || mockFallback.duration_road,
+      stops: mockFallback.stops // Still use mock named stops for transport card stops list
+    };
+  } else {
+    routeData = getRouteData(state.fromCity, state.toCity);
+  }
 
   // Header
   document.getElementById('result-from').textContent = state.fromCity;
   document.getElementById('result-to').textContent = state.toCity;
-  document.getElementById('result-distance').textContent = `~${routeData.distance} km`;
+  const distLabel = state.apiData
+    ? `${routeData.distance} km (OSRM)`
+    : `~${routeData.distance} km`;
+  document.getElementById('result-distance').textContent = distLabel;
   document.getElementById('result-date').textContent = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
   // Reset mode to all
@@ -438,7 +566,7 @@ function renderResults() {
   // Render transport cards
   renderTransportCards(routeData);
 
-  // Initialize all sections
+  // Initialize all subsections
   initJourneySubsections(routeData);
 }
 
@@ -845,14 +973,23 @@ function initJourneySubsections(routeData) {
         emoji = '🏁';
         desc = 'Destination point';
       } else {
-        // Check if this was originally a recommended stop
-        const routeKey = getRouteKey(state.fromCity, state.toCity);
-        const discoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
-        const matchedRec = discoveryStops.find(ds => ds.name.toLowerCase() === stopName.toLowerCase());
-        if (matchedRec) {
+        // Check if this was originally a real API stop or a recommended stop
+        const apiStops = state.apiData && state.apiData.stops ? state.apiData.stops : [];
+        const matchedApi = apiStops.find(ds => ds.name && ds.name.toLowerCase() === stopName.toLowerCase());
+        if (matchedApi) {
           type = 'recommended';
-          emoji = matchedRec.emoji || '⭐';
-          desc = matchedRec.desc;
+          emoji = matchedApi.emoji || '⭐';
+          desc = matchedApi.desc || 'Interesting place along the route';
+        } else {
+          // Fallback: check mock discovery stops
+          const routeKey = getRouteKey(state.fromCity, state.toCity);
+          const discoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
+          const matchedRec = discoveryStops.find(ds => ds.name.toLowerCase() === stopName.toLowerCase());
+          if (matchedRec) {
+            type = 'recommended';
+            emoji = matchedRec.emoji || '⭐';
+            desc = matchedRec.desc;
+          }
         }
       }
       return { name: stopName, type, emoji, desc };
@@ -860,13 +997,16 @@ function initJourneySubsections(routeData) {
     // Clear restore list so subsequent searches start fresh
     state.restoreStopsList = null;
   } else {
+    // Use real API discovery stops if available, otherwise fall back to mock
+    const apiStops = state.apiData && state.apiData.stops ? state.apiData.stops : [];
     const routeKey = getRouteKey(state.fromCity, state.toCity);
-    const discoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
-    
+    const mockDiscoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
+    const discoveryStops = apiStops.length ? apiStops : mockDiscoveryStops;
+
     state.currentStops = [
       { name: state.fromCity, type: 'start', emoji: '📍', desc: 'Starting point of your journey' }
     ];
-    
+
     discoveryStops.slice(0, 2).forEach(s => {
       state.currentStops.push({
         name: s.name,
@@ -875,7 +1015,7 @@ function initJourneySubsections(routeData) {
         desc: s.desc
       });
     });
-    
+
     state.currentStops.push({
       name: state.toCity,
       type: 'dest',
@@ -968,8 +1108,8 @@ function renderAllSubsections(routeData) {
   renderMockMapFromStops();
   renderAIItinerary();
   renderBudgetEstimate(routeData);
-  renderWeatherInfo();
-  renderSafetyQuickTips();
+  renderWeatherInfo(state.apiData ? state.apiData.weather : null);
+  renderSafetyQuickTips(state.apiData ? state.apiData.safety : null);
 }
 
 function renderStopsTimeline() {
@@ -1016,28 +1156,48 @@ window.removeStop = function(index) {
 };
 
 function renderDiscoveryGrid() {
+  // Prefer real API stops from OSM Overpass; fall back to curated mock data
+  const apiStops = state.apiData && state.apiData.stops ? state.apiData.stops : [];
   const routeKey = getRouteKey(state.fromCity, state.toCity);
-  const discoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
+  const mockDiscoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
+  const allDiscoveryStops = apiStops.length ? apiStops : mockDiscoveryStops;
+
   const currentNames = state.currentStops.map(s => s.name.toLowerCase());
-  const remaining = discoveryStops.filter(s => !currentNames.includes(s.name.toLowerCase()));
-  
+  const remaining = allDiscoveryStops.filter(s => !currentNames.includes(s.name.toLowerCase()));
+
   const grid = document.getElementById('discovery-cards-grid');
   if (remaining.length === 0) {
     grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--gray-500);font-size:0.9rem;padding:20px;">You have added all suggested spots along the route! 🗺️</p>';
     return;
   }
-  
-  grid.innerHTML = remaining.map(s => `
+
+  // Build HTML for each discovery stop — handle both real API format and mock format
+  grid.innerHTML = remaining.map(s => {
+    const emoji = s.emoji || '📍';
+    const desc = s.desc || 'An interesting place along your route.';
+    const distLabel = s.dist
+      ? `🗺️ ${s.dist}`
+      : s.distanceFromRoute != null
+        ? `🗺️ ~${s.distanceFromRoute.toFixed(1)} km from route`
+        : '';
+    const detourLabel = s.estimatedDetour ? ` · ⏱ ~${s.estimatedDetour} min detour` : '';
+    const sourceLabel = s.source ? `<span style="font-size:0.7rem;color:var(--gray-400);">${s.source}</span>` : '';
+    const safeEmoji = emoji.replace(/'/g, '');
+    const safeName = s.name.replace(/'/g, '\\&#39;');
+    const safeDesc = desc.replace(/'/g, '\\&#39;');
+    return `
     <div class="discovery-card">
-      <div class="discovery-card-img">${s.emoji}</div>
+      <div class="discovery-card-img">${emoji}</div>
       <div class="dc-body">
         <div class="dc-name">📍 ${s.name}</div>
-        <div class="dc-desc">${s.desc}</div>
-        <div class="dc-meta">🗺️ ${s.dist}</div>
-        <button class="btn-explore" style="width:100%;cursor:pointer;" onclick="addStopFromDiscovery('${s.name}', '${s.desc}', '${s.emoji}')">Add Stop +</button>
+        <div class="dc-desc">${desc}</div>
+        ${distLabel ? `<div class="dc-meta">${distLabel}${detourLabel}</div>` : ''}
+        ${sourceLabel}
+        <button class="btn-explore" style="width:100%;cursor:pointer;margin-top:8px;" onclick="addStopFromDiscovery('${s.name}', '${desc}', '${safeEmoji}')">Add Stop +</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 window.addStopFromDiscovery = function(name, desc, emoji) {
@@ -1291,44 +1451,103 @@ window.updateBudgetLimit = function(val) {
   renderBudgetEstimate(routeData);
 };
 
-function renderWeatherInfo() {
+function renderWeatherInfo(weatherData) {
   document.getElementById('weather-city').textContent = state.toCity;
   const container = document.getElementById('weather-row');
-  
-  const temps = [24, 26, 28, 30, 32, 22];
-  const conditions = ['Clear Sky', 'Mostly Sunny', 'Partly Cloudy', 'Scattered Showers', 'Thunderstorms', 'Mist / Fog'];
-  const icons = ['☀️', '🌤️', '⛅', '🌦️', '⛈️', '🌫️'];
-  
-  const idx = randBetween(0, temps.length - 1);
-  const temp = temps[idx];
-  const cond = conditions[idx];
-  const icon = icons[idx];
-  
-  container.innerHTML = `
-    <div class="weather-main">
-      <span class="weather-icon-big">${icon}</span>
-      <div class="weather-cond-col">
-        <span class="weather-temp">${temp}°C</span>
-        <span class="weather-cond">${cond}</span>
+
+  if (weatherData && weatherData.temperature != null) {
+    // Real weather data from Open-Meteo API
+    const temp = Math.round(weatherData.temperature);
+    const cond = weatherData.condition || 'Weather data';
+    const icon = weatherData.icon || '🌡️';
+    const tempMax = weatherData.tempMax != null ? Math.round(weatherData.tempMax) : temp;
+    const tempMin = weatherData.tempMin != null ? Math.round(weatherData.tempMin) : temp;
+    const windspeed = weatherData.windspeed != null ? Math.round(weatherData.windspeed) : '--';
+    const precipProb = weatherData.precipitationProb != null ? weatherData.precipitationProb : 0;
+
+    const forecastHtml = (weatherData.forecast || []).map(f => `
+      <div class="weather-forecast-item" style="text-align:center;padding:8px;border-radius:8px;background:rgba(0,0,0,0.04);">
+        <div style="font-size:0.7rem;color:var(--gray-400);">${new Date(f.date).toLocaleDateString('en-IN', {weekday:'short'})}</div>
+        <div style="font-size:1.1rem;">${f.icon || '🌡️'}</div>
+        <div style="font-size:0.78rem;font-weight:600;">${f.tempMax != null ? Math.round(f.tempMax) : '?'}°/${f.tempMin != null ? Math.round(f.tempMin) : '?'}°</div>
+        <div style="font-size:0.65rem;color:var(--gray-500);">${f.condition || ''}</div>
       </div>
-    </div>
-    <div class="weather-detail-grid">
-      <div class="weather-detail-item">💧 Humidity: ${randBetween(40, 85)}%</div>
-      <div class="weather-detail-item">💨 Wind speed: ${randBetween(5, 18)} km/h</div>
-      <div class="weather-detail-item">👁️ Visibility: ${randBetween(6, 10)} km</div>
-    </div>
-  `;
+    `).join('');
+
+    container.innerHTML = `
+      <div class="weather-main">
+        <span class="weather-icon-big">${icon}</span>
+        <div class="weather-cond-col">
+          <span class="weather-temp">${temp}°C</span>
+          <span class="weather-cond">${cond}</span>
+          <span style="font-size:0.75rem;color:var(--gray-400);">H:${tempMax}° / L:${tempMin}°</span>
+          <span style="font-size:0.65rem;color:var(--color-accent);margin-top:2px;">📡 Live — Open-Meteo</span>
+        </div>
+      </div>
+      <div class="weather-detail-grid">
+        <div class="weather-detail-item">💨 Wind: ${windspeed} km/h</div>
+        <div class="weather-detail-item">🌧️ Rain chance: ${precipProb}%</div>
+        <div class="weather-detail-item">📅 Today's range: ${tempMin}° – ${tempMax}°</div>
+      </div>
+      ${forecastHtml ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px;">${forecastHtml}</div>` : ''}
+    `;
+  } else {
+    // Fallback: estimated/mock weather
+    const temps = [24, 26, 28, 30, 32, 22];
+    const conditions = ['Clear Sky', 'Mostly Sunny', 'Partly Cloudy', 'Scattered Showers', 'Thunderstorms', 'Mist / Fog'];
+    const icons = ['☀️', '🌤️', '⛅', '🌦️', '⛈️', '🌫️'];
+    const idx = randBetween(0, temps.length - 1);
+    const temp = temps[idx];
+    const cond = conditions[idx];
+    const icon = icons[idx];
+    container.innerHTML = `
+      <div class="weather-main">
+        <span class="weather-icon-big">${icon}</span>
+        <div class="weather-cond-col">
+          <span class="weather-temp">${temp}°C</span>
+          <span class="weather-cond">${cond}</span>
+          <span style="font-size:0.65rem;color:var(--gray-400);margin-top:2px;">⚠️ Estimated (live unavailable)</span>
+        </div>
+      </div>
+      <div class="weather-detail-grid">
+        <div class="weather-detail-item">💧 Humidity: ${randBetween(40, 85)}%</div>
+        <div class="weather-detail-item">💨 Wind speed: ${randBetween(5, 18)} km/h</div>
+        <div class="weather-detail-item">👁️ Visibility: ${randBetween(6, 10)} km</div>
+      </div>
+    `;
+  }
 }
 
-function renderSafetyQuickTips() {
+function renderSafetyQuickTips(safetyData) {
   const container = document.getElementById('safety-tips-row');
+
+  // Build tips from real safety data or static fallback
   const tips = [
     { title: 'Share Live Location', desc: 'Always keep trusted contacts updated on your journey using the Share link.', icon: '📍' },
     { title: 'Verify Ride & OTP', desc: 'Verify the vehicle license plate, driver details and never share OTP before trip starts.', icon: '🛡️' },
     { title: 'Carry Emergency Contacts', desc: 'Keep helpline numbers saved offline in case of cellular network outages.', icon: '📞' }
   ];
-  
-  container.innerHTML = tips.map(t => `
+
+  let numbersHtml = '';
+  if (safetyData && safetyData.numbers && safetyData.numbers.length) {
+    numbersHtml = `
+      <div class="safety-tip-card" style="grid-column:1/-1;">
+        <h4>🚨 Emergency Helpline Numbers</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+          ${safetyData.numbers.map(n => `
+            <span style="padding:4px 10px;border-radius:20px;background:rgba(239,68,68,0.1);color:#DC2626;font-size:0.8rem;font-weight:600;">
+              ${n.name}: ${n.number}
+            </span>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  const apiTips = safetyData && safetyData.tips ? safetyData.tips.slice(0, 3) : [];
+  const displayTips = apiTips.length ? apiTips.map(t => ({ title: t.title || t, desc: t.desc || '', icon: t.icon || '✅' })) : tips;
+
+  container.innerHTML = numbersHtml + displayTips.map(t => `
     <div class="safety-tip-card">
       <h4>${t.icon} ${t.title}</h4>
       <p>${t.desc}</p>
