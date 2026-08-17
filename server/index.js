@@ -17,6 +17,8 @@ const geoService = require('./services/geoService');
 const weatherService = require('./services/weatherService');
 const placesService = require('./services/placesService');
 const safetyService = require('./services/safetyService');
+const fareService = require('./services/fareService');
+const grokService = require('./services/grokService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -151,6 +153,77 @@ app.get('/api/journey', async (req, res, next) => {
     next(err);
   }
 });
+
+// ── 3B. API: SMART JOURNEY WITH GROK ANALYSIS ────────────────────
+app.get('/api/smart-journey', async (req, res, next) => {
+  const { fromLat, fromLon, toLat, toLon, fromName, toName } = req.query;
+  
+  if (!fromLat || !fromLon || !toLat || !toLon) {
+    return res.status(400).json({ error: 'Missing coordinates parameter(s). Required: fromLat, fromLon, toLat, toLon' });
+  }
+
+  const originName = fromName || 'Origin';
+  const destName = toName || 'Destination';
+
+  try {
+    // 1. Get Route path from OSRM
+    const route = await geoService.getRoute(
+      parseFloat(fromLat), parseFloat(fromLon),
+      parseFloat(toLat), parseFloat(toLon)
+    );
+
+    // 2. Query weather at destination coordinate
+    const weather = await weatherService.getWeather(parseFloat(toLat), parseFloat(toLon));
+
+    // 3. Query attractions along the OSRM route line
+    const stops = await placesService.discoverAlongRoute(route.geometry);
+
+    // 4. Retrieve emergency contact registry numbers
+    const safetyNumbers = await safetyService.getEmergencyNumbers(supabase);
+
+    // 5. Generate realistic estimated fares context
+    const fares = fareService.buildFareContext(route.distance, originName, destName);
+
+    // 6. Run Grok analysis over the gathered API data and fares
+    const grokAnalysis = await grokService.analyzeJourney({
+      origin: originName,
+      destination: destName,
+      distance: route.distance,
+      duration: route.duration,
+      weather: weather,
+      stops: stops,
+      fares: fares
+    });
+
+    res.json({
+      distance: route.distance,
+      duration: route.duration,
+      geometry: route.geometry,
+      weather: weather,
+      stops: stops,
+      safety: {
+        numbers: safetyNumbers,
+        tips: safetyService.SAFETY_TIPS
+      },
+      fares: fares,
+      grokAnalysis: grokAnalysis,
+      dataStatus: grokAnalysis.dataStatus || 'estimated',
+      metadata: {
+        timestamp: new Date().toISOString(),
+        routingProvider: 'OSRM Project (API-sourced)',
+        weatherProvider: 'Open-Meteo (API-sourced)',
+        placesProvider: 'OpenStreetMap Overpass API (API-sourced)',
+        fareProvider: 'Local Lenz Fare Engine (Estimated)',
+        grokProvider: grokAnalysis.grokAnalyzed ? 'xAI Grok (AI-analyzed)' : 'Local Lenz Intelligence (Rule-based estimated)'
+      }
+    });
+
+  } catch (err) {
+    console.error('Smart journey processing failure:', err.message);
+    next(err);
+  }
+});
+
 
 // ── 4. API: NEARBY SAFETY SERVICES ──────────────────────────────
 app.get('/api/nearby', async (req, res, next) => {

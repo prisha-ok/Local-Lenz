@@ -469,20 +469,22 @@ async function triggerSearch() {
       }
     }
 
-    // 2. Call the real journey API if we have coordinates
+    // 2. Call the real smart-journey API if we have coordinates
     let apiData = null;
     if (state.fromCoords && state.toCoords) {
       const params = new URLSearchParams({
         fromLat: state.fromCoords.lat,
         fromLon: state.fromCoords.lon,
         toLat: state.toCoords.lat,
-        toLon: state.toCoords.lon
+        toLon: state.toCoords.lon,
+        fromName: state.fromCity,
+        toName: state.toCity
       });
-      const journeyRes = await fetch(`/api/journey?${params}`);
+      const journeyRes = await fetch(`/api/smart-journey?${params}`);
       if (journeyRes.ok) {
         apiData = await journeyRes.json();
       } else {
-        console.warn('Journey API returned non-OK:', journeyRes.status);
+        console.warn('Smart Journey API returned non-OK:', journeyRes.status);
       }
     } else {
       console.warn('Could not geocode one or both cities — falling back to mock data.');
@@ -556,6 +558,58 @@ function renderResults() {
     : `~${routeData.distance} km`;
   document.getElementById('result-distance').textContent = distLabel;
   document.getElementById('result-date').textContent = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+  // Update dynamic status badges
+  const statusBadge = document.getElementById('result-status-badge');
+  const itineraryBadge = document.getElementById('itinerary-badge');
+  const budgetBadge = document.getElementById('budget-badge');
+  const weatherBadge = document.getElementById('weather-badge');
+
+  if (state.apiData) {
+    const isGrok = state.apiData.grokAnalysis && state.apiData.grokAnalysis.grokAnalyzed;
+    
+    if (statusBadge) {
+      statusBadge.textContent = isGrok ? '🤖 AI-Analyzed' : '🟢 Live / API-sourced';
+      statusBadge.style.backgroundColor = isGrok ? 'var(--color-primary)' : 'var(--teal)';
+      statusBadge.style.color = 'white';
+    }
+    if (itineraryBadge) {
+      itineraryBadge.textContent = isGrok ? '🤖 AI-Analyzed' : '🟡 Estimated (Fallback)';
+      itineraryBadge.style.backgroundColor = isGrok ? 'var(--color-primary)' : 'var(--gray-100)';
+      itineraryBadge.style.color = isGrok ? 'white' : 'var(--gray-700)';
+    }
+    if (budgetBadge) {
+      budgetBadge.textContent = '🟡 Estimated (Fare Engine)';
+      budgetBadge.style.backgroundColor = 'var(--gray-100)';
+      budgetBadge.style.color = 'var(--gray-700)';
+    }
+    if (weatherBadge) {
+      weatherBadge.textContent = '🟢 Live — Open-Meteo';
+      weatherBadge.style.backgroundColor = 'var(--teal)';
+      weatherBadge.style.color = 'white';
+    }
+  } else {
+    if (statusBadge) {
+      statusBadge.textContent = '🟡 Estimated';
+      statusBadge.style.backgroundColor = 'var(--gray-100)';
+      statusBadge.style.color = 'var(--gray-700)';
+    }
+    if (itineraryBadge) {
+      itineraryBadge.textContent = '🟡 Estimated';
+      itineraryBadge.style.backgroundColor = 'var(--gray-100)';
+      itineraryBadge.style.color = 'var(--gray-700)';
+    }
+    if (budgetBadge) {
+      budgetBadge.textContent = '🟡 Estimated';
+      budgetBadge.style.backgroundColor = 'var(--gray-100)';
+      budgetBadge.style.color = 'var(--gray-700)';
+    }
+    if (weatherBadge) {
+      weatherBadge.textContent = '🟡 Estimated';
+      weatherBadge.style.backgroundColor = 'var(--gray-100)';
+      weatherBadge.style.color = 'var(--gray-700)';
+    }
+  }
 
   // Reset mode to all
   state.currentMode = 'all';
@@ -703,68 +757,154 @@ function renderTransportCards(routeData) {
   const roadTime = routeData.duration_road;
   const isDelhi = (state.fromCity.toLowerCase().includes("delhi") || state.toCity.toLowerCase().includes("delhi"));
 
-  const cards = [
-    {
-      type: 'metro', icon: '🚇', title: 'Metro',
-      fare: isDelhi ? '₹40' : '₹60',
-      duration: '35 min',
-      options: 'Delhi Metro Rail (DMRC)',
-      distance: `${dist} km`,
-      badge: isDelhi ? 'Recommended' : 'Economical',
-      action: 'View Metro Info',
-      note: 'Yellow & Blue Lines'
-    },
-    {
-      type: 'train', icon: '🚆', title: 'Train',
-      fare: `₹${Math.round(calcTrainFare(dist) * dist)}`,
-      duration: formatDuration(roadTime * 0.7),
-      options: `${randBetween(8, 25)} trains available`,
-      distance: `${dist} km`,
-      badge: 'Best Value',
-      action: 'View Train Options',
-      note: 'Sleeper • 3AC • 2AC'
-    },
-    {
-      type: 'bus', icon: '🚌', title: 'Bus',
-      fare: `₹${Math.round(calcBusFare(dist) * dist)}`,
-      duration: formatDuration(roadTime * 1.15),
-      options: `${randBetween(5, 20)} buses available`,
-      distance: `${dist} km`,
-      badge: 'Economical',
-      action: 'View Bus Options',
-      note: 'AC • Non-AC • Sleeper'
-    },
-    {
-      type: 'cab', icon: '🚕', title: 'Cab',
-      fare: `₹${calcCabFare(dist)}`,
-      duration: formatDuration(roadTime),
-      options: 'Ola • Uber • Rapido • InDrive',
-      distance: `${dist} km`,
-      badge: 'Door-to-Door',
-      action: 'Compare Cabs',
-      note: 'Sedan • SUV • Premium'
-    },
-    {
-      type: 'bike', icon: '🏍️', title: 'Bike Taxi',
-      fare: `₹${calcBikeFare(dist)}`,
-      duration: formatDuration(Math.round(roadTime * 0.9)),
-      options: 'Rapido • Ola Bike • Uber Moto',
-      distance: `${dist} km`,
-      badge: 'Fastest',
-      action: 'Compare Bikes',
-      note: 'Budget option'
-    },
-    {
-      type: 'auto', icon: '🛺', title: 'Auto Rickshaw',
-      fare: `₹${calcAutoFare(dist)}`,
-      duration: formatDuration(Math.round(roadTime * 1.05)),
-      options: 'Rapido Auto • Ola Auto • Metered',
-      distance: `${dist} km`,
-      badge: 'Local Fav',
-      action: 'Compare Autos',
-      note: 'For shorter trips'
-    }
-  ];
+  // Check if we have Grok's recommendation
+  const grokRecMode = state.apiData && state.apiData.grokAnalysis && state.apiData.grokAnalysis.recommended 
+    ? state.apiData.grokAnalysis.recommended.mode 
+    : null;
+
+  let cards = [];
+
+  if (state.apiData && state.apiData.fares && state.apiData.fares.options) {
+    // ── Use backend-sourced fare details ──
+    const backendFares = state.apiData.fares.options;
+
+    cards = backendFares.map(opt => {
+      const mode = opt.mode;
+      let durationStr = '';
+      let badge = '';
+      let action = '';
+      let note = '';
+
+      if (mode === 'metro') {
+        durationStr = isDelhi ? '35 min' : '45 min';
+        badge = 'Economical';
+        action = 'View Metro Info';
+        note = isDelhi ? 'Yellow & Blue Lines' : 'Local Transit';
+      } else if (mode === 'train') {
+        durationStr = formatDuration(roadTime * 0.7);
+        badge = 'Best Value';
+        action = 'View Train Options';
+        note = 'Sleeper • 3AC • 2AC';
+      } else if (mode === 'bus') {
+        durationStr = formatDuration(roadTime * 1.15);
+        badge = 'Standard';
+        action = 'View Bus Options';
+        note = 'AC • Non-AC • Sleeper';
+      } else if (mode === 'cab') {
+        durationStr = formatDuration(roadTime);
+        badge = 'Door-to-Door';
+        action = 'Compare Cabs';
+        note = 'Sedan • SUV • Premium';
+      } else if (mode === 'bike') {
+        durationStr = formatDuration(Math.round(roadTime * 0.9));
+        badge = 'Fastest';
+        action = 'Compare Bikes';
+        note = 'Solo Rider';
+      } else if (mode === 'auto') {
+        durationStr = formatDuration(Math.round(roadTime * 1.05));
+        badge = 'Local Fav';
+        action = 'Compare Autos';
+        note = 'Short trips';
+      } else {
+        durationStr = '--';
+        badge = 'Standard';
+        action = 'Explore';
+        note = '';
+      }
+
+      // If this is Grok's recommendation, highlight it
+      if (grokRecMode && mode === grokRecMode) {
+        badge = '⭐ Grok\'s Pick';
+      }
+
+      return {
+        type: mode,
+        icon: opt.icon || '🚗',
+        title: opt.label || mode.charAt(0).toUpperCase() + mode.slice(1),
+        fare: opt.available ? opt.fareDisplay : 'N/A',
+        duration: durationStr,
+        options: opt.provider || 'Local services',
+        distance: `${dist.toFixed(1)} km`,
+        badge: badge,
+        action: action,
+        note: opt.fareNote || note,
+        available: opt.available
+      };
+    }).filter(c => c.available !== false); // hide unavailable modes
+
+  } else {
+    // ── Local Fallback Mode (Fixed train/bus double-multiplication bug) ──
+    const trainFareVal = Math.round(calcTrainFare(dist));
+    const busFareVal = Math.round(calcBusFare(dist));
+
+    cards = [
+      {
+        type: 'metro', icon: '🚇', title: 'Metro',
+        fare: isDelhi ? '₹40' : '₹60',
+        duration: '35 min',
+        options: 'Delhi Metro Rail (DMRC)',
+        distance: `${dist.toFixed(1)} km`,
+        badge: (grokRecMode === 'metro') ? '⭐ Grok\'s Pick' : (isDelhi ? 'Recommended' : 'Economical'),
+        action: 'View Metro Info',
+        note: 'Yellow & Blue Lines'
+      },
+      {
+        type: 'train', icon: '🚆', title: 'Train',
+        fare: `₹${trainFareVal}`,
+        duration: formatDuration(roadTime * 0.7),
+        options: `${randBetween(8, 25)} trains available`,
+        distance: `${dist.toFixed(1)} km`,
+        badge: (grokRecMode === 'train') ? '⭐ Grok\'s Pick' : 'Best Value',
+        action: 'View Train Options',
+        note: 'Sleeper • 3AC • 2AC'
+      },
+      {
+        type: 'bus', icon: '🚌', title: 'Bus',
+        fare: `₹${busFareVal}`,
+        duration: formatDuration(roadTime * 1.15),
+        options: `${randBetween(5, 20)} buses available`,
+        distance: `${dist.toFixed(1)} km`,
+        badge: (grokRecMode === 'bus') ? '⭐ Grok\'s Pick' : 'Economical',
+        action: 'View Bus Options',
+        note: 'AC • Non-AC • Sleeper'
+      },
+      {
+        type: 'cab', icon: '🚕', title: 'Cab',
+        fare: `₹${calcCabFare(dist)}`,
+        duration: formatDuration(roadTime),
+        options: 'Ola • Uber • Rapido • InDrive',
+        distance: `${dist.toFixed(1)} km`,
+        badge: (grokRecMode === 'cab') ? '⭐ Grok\'s Pick' : 'Door-to-Door',
+        action: 'Compare Cabs',
+        note: 'Sedan • SUV • Premium'
+      },
+      {
+        type: 'bike', icon: '🏍️', title: 'Bike Taxi',
+        fare: `₹${calcBikeFare(dist)}`,
+        duration: formatDuration(Math.round(roadTime * 0.9)),
+        options: 'Rapido • Ola Bike • Uber Moto',
+        distance: `${dist.toFixed(1)} km`,
+        badge: (grokRecMode === 'bike') ? '⭐ Grok\'s Pick' : 'Fastest',
+        action: 'Compare Bikes',
+        note: 'Budget option'
+      },
+      {
+        type: 'auto', icon: '🛺', title: 'Auto Rickshaw',
+        fare: `₹${calcAutoFare(dist)}`,
+        duration: formatDuration(Math.round(roadTime * 1.05)),
+        options: 'Rapido Auto • Ola Auto • Metered',
+        distance: `${dist.toFixed(1)} km`,
+        badge: (grokRecMode === 'auto') ? '⭐ Grok\'s Pick' : 'Local Fav',
+        action: 'Compare Autos',
+        note: 'For shorter trips'
+      }
+    ];
+  }
+
+  // Filter out auto/bike if it's an intercity trip (distance > 50km) and we are in local fallback
+  if (dist > 50 && !(state.apiData && state.apiData.fares)) {
+    cards = cards.filter(c => c.type !== 'auto' && c.type !== 'bike');
+  }
 
   sortCards(cards, state.currentFilter);
   renderCardElements(cards);
@@ -1282,96 +1422,143 @@ function renderMockMapFromStops() {
 
 function renderAIItinerary() {
   const container = document.getElementById('itinerary-list');
-  const steps = [];
-  const totalStops = state.currentStops.length;
+  const grok = state.apiData && state.apiData.grokAnalysis ? state.apiData.grokAnalysis : null;
 
-  // Spread available travel hours (8AM to 8PM = 12 hours) across stops
-  const START_HOUR = 8; // 8:00 AM
-  const END_HOUR = 20;  // 8:00 PM
-  const totalMinutes = (END_HOUR - START_HOUR) * 60;
+  let steps = [];
+  let recommendationHtml = '';
 
-  // Richer activity suggestions per stop type
-  const midActivities = [
-    { icon: '🍽️', label: 'Try local cuisine and street food' },
-    { icon: '📸', label: 'Photograph the landmark and surroundings' },
-    { icon: '🛍️', label: 'Browse local handicrafts and souvenirs' },
-    { icon: '🚶', label: 'Take a guided walking tour of the area' },
-    { icon: '☕', label: 'Relax at a local café and plan next leg' }
-  ];
+  // 1. If Grok analysis is available, render the recommendation summary panel
+  if (grok) {
+    const rec = grok.recommended || {};
+    const budget = grok.budgetSuggestion || {};
+    const disc = grok.discoveryAdvice || '';
+    
+    const modeIcons = { metro: '🚇', train: '🚆', bus: '🚌', cab: '🚕', bike: '🏍️', auto: '🛺', walk: '🚶' };
+    const modeLabel = rec.mode ? (rec.mode.charAt(0).toUpperCase() + rec.mode.slice(1)) : 'Optimal Mode';
+    const modeIcon = modeIcons[rec.mode] || '🚗';
 
-  function toTimeStr(totalMinFromStart) {
-    const absMin = START_HOUR * 60 + totalMinFromStart;
-    const h = Math.floor(absMin / 60) % 24;
-    const m = absMin % 60;
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const dispH = h > 12 ? h - 12 : h === 0 ? 12 : h;
-    return `${dispH}:${m.toString().padStart(2, '0')} ${ampm}`;
+    recommendationHtml = `
+      <div class="grok-recommendation-card" style="background: linear-gradient(135deg, rgba(15, 155, 142, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%); border: 1.5px solid rgba(15, 155, 142, 0.2); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+          <span style="font-size:1.4rem;">🤖</span>
+          <h4 style="margin:0; font-size:1rem; color:var(--gray-800); font-weight:700;">Grok Intelligent Travel Analysis</h4>
+          <span class="rss-badge" style="margin-left:auto; background:var(--color-primary); color:white;">AI-Analyzed</span>
+        </div>
+        
+        <div style="display:flex; align-items:flex-start; gap:12px; background:white; padding:12px; border-radius:8px; border:1px solid var(--gray-150); margin-bottom:12px;">
+          <span style="font-size:2rem; padding:4px; background:var(--gray-100); border-radius:8px;">${modeIcon}</span>
+          <div>
+            <div style="font-size:0.75rem; font-weight:600; color:var(--gray-400); text-transform:uppercase;">Recommended Mode</div>
+            <div style="font-size:1.1rem; font-weight:700; color:var(--gray-800); margin:2px 0 4px;">${modeLabel}</div>
+            <p style="margin:0; font-size:0.85rem; color:var(--gray-600); line-height:1.4;">${rec.reason || 'Optimal travel mode calculated based on your route parameters.'}</p>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr; gap:8px; font-size:0.8rem; color:var(--gray-600);">
+          ${budget.advice ? `<div style="display:flex; align-items:center; gap:6px;">🪙 <strong>Budget:</strong> ${budget.advice}</div>` : ''}
+          ${disc ? `<div style="display:flex; align-items:center; gap:6px;">📍 <strong>Stops:</strong> ${disc}</div>` : ''}
+        </div>
+      </div>
+    `;
+
+    // Use Grok's custom generated itinerary steps if they exist
+    if (grok.itinerary && grok.itinerary.length) {
+      steps = grok.itinerary;
+    }
   }
 
-  state.currentStops.forEach((stop, i) => {
-    const frac = totalStops > 1 ? i / (totalStops - 1) : 0;
-    const minuteOffset = Math.round(frac * totalMinutes);
-    const timeStr = toTimeStr(minuteOffset);
+  // 2. Fallback to generating steps locally if Grok didn't supply them
+  if (!steps.length) {
+    const totalStops = state.currentStops.length;
+    const START_HOUR = 8; // 8:00 AM
+    const END_HOUR = 20;  // 8:00 PM
+    const totalMinutes = (END_HOUR - START_HOUR) * 60;
 
-    if (i === 0) {
-      steps.push({
-        time: timeStr,
-        icon: '🚀',
-        tag: 'Departure',
-        tagColor: '#3B82F6',
-        title: `Depart from ${stop.name}`,
-        desc: `Begin your journey! Confirm your booking, pack essentials, and double-check your travel documents.`,
-        tips: ['Keep ID & tickets ready', 'Share location with a trusted contact', 'Charge your devices']
-      });
-    } else if (i === totalStops - 1) {
-      steps.push({
-        time: timeStr,
-        icon: '🏁',
-        tag: 'Arrival',
-        tagColor: '#F59E0B',
-        title: `Arrive at ${stop.name}`,
-        desc: `Welcome to your destination! Head to your accommodation, freshen up, and explore at your own pace.`,
-        tips: ['Note emergency numbers', 'Check local transport options', 'Explore nearby dining']
-      });
-    } else {
-      const activity = midActivities[(i - 1) % midActivities.length];
-      const stayDuration = Math.max(30, Math.round(totalMinutes / (totalStops + 1)));
-      const nextStop = state.currentStops[i + 1];
-      const isRec = stop.type === 'recommended';
-      steps.push({
-        time: timeStr,
-        icon: isRec ? '⭐' : '📍',
-        tag: isRec ? 'Recommended Stop' : 'Custom Stop',
-        tagColor: isRec ? '#10B981' : '#8B5CF6',
-        title: `Explore ${stop.name}`,
-        desc: stop.desc || `Take ${stayDuration} min to explore this stop. ${activity.icon} ${activity.label}.`,
-        tips: [
-          `Estimated stay: ~${stayDuration} min`,
-          nextStop ? `Next: ${nextStop.name}` : 'Heading to final destination',
-          'Hydrate and rest before continuing'
-        ]
-      });
+    const midActivities = [
+      { icon: '🍽️', label: 'Try local cuisine and street food' },
+      { icon: '📸', label: 'Photograph the landmark and surroundings' },
+      { icon: '🛍️', label: 'Browse local handicrafts and souvenirs' },
+      { icon: '🚶', label: 'Take a guided walking tour of the area' },
+      { icon: '☕', label: 'Relax at a local café and plan next leg' }
+    ];
+
+    function toTimeStr(totalMinFromStart) {
+      const absMin = START_HOUR * 60 + totalMinFromStart;
+      const h = Math.floor(absMin / 60) % 24;
+      const m = absMin % 60;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const dispH = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      return `${dispH}:${m.toString().padStart(2, '0')} ${ampm}`;
     }
-  });
 
-  container.innerHTML = steps.map((s, i) => `
-    <div class="itinerary-item" style="--iti-accent:${s.tagColor};">
+    state.currentStops.forEach((stop, i) => {
+      const frac = totalStops > 1 ? i / (totalStops - 1) : 0;
+      const minuteOffset = Math.round(frac * totalMinutes);
+      const timeStr = toTimeStr(minuteOffset);
+
+      if (i === 0) {
+        steps.push({
+          time: timeStr,
+          icon: '🚀',
+          tag: 'Departure',
+          tagColor: '#3B82F6',
+          title: `Depart from ${stop.name}`,
+          desc: `Begin your journey! Confirm your booking, pack essentials, and double-check your travel documents.`,
+          tips: ['Keep ID & tickets ready', 'Share location with a trusted contact', 'Charge your devices']
+        });
+      } else if (i === totalStops - 1) {
+        steps.push({
+          time: timeStr,
+          icon: '🏁',
+          tag: 'Arrival',
+          tagColor: '#F59E0B',
+          title: `Arrive at ${stop.name}`,
+          desc: `Welcome to your destination! Head to your accommodation, freshen up, and explore at your own pace.`,
+          tips: ['Note emergency numbers', 'Check local transport options', 'Explore nearby dining']
+        });
+      } else {
+        const activity = midActivities[(i - 1) % midActivities.length];
+        const stayDuration = Math.max(30, Math.round(totalMinutes / (totalStops + 1)));
+        const nextStop = state.currentStops[i + 1];
+        const isRec = stop.type === 'recommended';
+        steps.push({
+          time: timeStr,
+          icon: isRec ? '⭐' : '📍',
+          tag: isRec ? 'Recommended Stop' : 'Custom Stop',
+          tagColor: isRec ? '#10B981' : '#8B5CF6',
+          title: `Explore ${stop.name}`,
+          desc: stop.desc || `Take ${stayDuration} min to explore this stop. ${activity.icon} ${activity.label}.`,
+          tips: [
+            `Estimated stay: ~${stayDuration} min`,
+            nextStop ? `Next: ${nextStop.name}` : 'Heading to final destination',
+            'Hydrate and rest before continuing'
+          ]
+        });
+      }
+    });
+  }
+
+  // 3. Render HTML
+  const itineraryHtml = steps.map((s, i) => `
+    <div class="itinerary-item" style="--iti-accent:${s.tagColor || '#10B981'};">
       <div class="iti-time">
         <span>${s.time}</span>
-        <span class="iti-icon">${s.icon}</span>
+        <span class="iti-icon">${s.icon || '📍'}</span>
       </div>
       <div class="iti-detail">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
           <h4 style="margin:0;font-size:0.95rem;">${s.title}</h4>
-          <span style="font-size:0.7rem;font-weight:700;background:${s.tagColor}20;color:${s.tagColor};padding:2px 8px;border-radius:20px;white-space:nowrap;">${s.tag}</span>
+          <span style="font-size:0.7rem;font-weight:700;background:${s.tagColor || '#10B981'}20;color:${s.tagColor || '#10B981'};padding:2px 8px;border-radius:20px;white-space:nowrap;">${s.tag || 'Stop'}</span>
         </div>
         <p style="margin:0 0 8px;font-size:0.85rem;color:var(--gray-600);">${s.desc}</p>
         <ul style="margin:0;padding-left:16px;font-size:0.78rem;color:var(--gray-500);">
-          ${s.tips.map(t => `<li>${t}</li>`).join('')}
+          ${(s.tips || []).map(t => `<li>${t}</li>`).join('')}
         </ul>
       </div>
     </div>
   `).join('');
+
+  container.innerHTML = recommendationHtml + itineraryHtml;
 }
 
 function renderBudgetEstimate(routeData) {
@@ -1380,7 +1567,30 @@ function renderBudgetEstimate(routeData) {
   const numMidStops = Math.max(0, state.currentStops.length - 2);
 
   // Cost breakdown
-  const transportCost = Math.round(dist * randBetween(10, 15)); // ₹10–15/km cab estimate
+  let transportCost;
+  let transportLabel = 'Transport (Cab est.)';
+  let transportIcon = '🚕';
+
+  if (state.apiData && state.apiData.fares && state.apiData.fares.options) {
+    const grokRecMode = state.apiData.grokAnalysis && state.apiData.grokAnalysis.recommended 
+      ? state.apiData.grokAnalysis.recommended.mode 
+      : null;
+    const recommendedOpt = state.apiData.fares.options.find(o => o.mode === grokRecMode && o.available);
+    const fallbackOpt = state.apiData.fares.options.find(o => o.available);
+    const targetOpt = recommendedOpt || fallbackOpt;
+
+    if (targetOpt) {
+      transportCost = targetOpt.fare || 0;
+      transportLabel = `Transport (${targetOpt.label})`;
+      transportIcon = targetOpt.icon || '🚕';
+    } else {
+      transportCost = Math.round(dist * 12);
+      transportLabel = 'Transport (Est.)';
+    }
+  } else {
+    transportCost = Math.round(dist * randBetween(10, 15)); // ₹10–15/km cab estimate
+  }
+
   const foodCost = Math.round((numMidStops + 1) * randBetween(120, 200));
   const sightCost = Math.round(numMidStops * randBetween(80, 150));
   const miscCost = Math.round(dist * 0.5 + 50);  // parking, tolls etc.
@@ -1391,7 +1601,7 @@ function renderBudgetEstimate(routeData) {
   const isOverBudget = total > state.budgetLimit;
 
   const items = [
-    { label: 'Transport (Cab est.)', val: transportCost, icon: '🚕' },
+    { label: transportLabel, val: transportCost, icon: transportIcon },
     { label: 'Food & Drinks', val: foodCost, icon: '🍽️' },
     { label: 'Sightseeing & Entry', val: sightCost, icon: '🎟️' },
     { label: 'Misc (Tolls, Parking)', val: miscCost, icon: '🅿️' }
