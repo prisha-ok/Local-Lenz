@@ -155,38 +155,6 @@ async function discoverAlongRoute(routeGeometry) {
     .sort((a, b) => a.distanceFromRoute - b.distanceFromRoute)
     .slice(0, 6);
 
-  // Fallback: If OSM returns empty (e.g. rate-limit or network timeout), load default verified mock stops
-  if (results.length === 0) {
-    return [
-      {
-        name: "Mathura Vrindavan Temple",
-        lat: 27.4924,
-        lon: 77.6737,
-        category: "religious",
-        emoji: "🛕",
-        desc: "Famous birth land of Lord Krishna, rich in culture and heritage.",
-        distanceFromRoute: 3.5,
-        estimatedDetour: 25,
-        placeId: 10001,
-        rating: 4.8,
-        source: "Static Verified Data"
-      },
-      {
-        name: "Akbar Tomb Sikandra",
-        lat: 27.2205,
-        lon: 77.9507,
-        category: "historical",
-        emoji: "🏛️",
-        desc: "Architectural masterpiece containing Akbar's final resting place.",
-        distanceFromRoute: 0.8,
-        estimatedDetour: 10,
-        placeId: 10002,
-        rating: 4.5,
-        source: "Static Verified Data"
-      }
-    ];
-  }
-
   return results;
 }
 

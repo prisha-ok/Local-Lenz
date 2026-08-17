@@ -27,105 +27,6 @@ const INDIAN_CITIES = [
   "Visakhapatnam", "Vrindavan", "Mathura", "Lajpat Nagar, Delhi", "Chandni Chowk, Delhi"
 ];
 
-// Route data: key = "From|To", value = route info
-const ROUTE_DATA = {
-  "Lajpat Nagar, Delhi|Chandni Chowk, Delhi": { distance: 15, duration_road: 40, stops: ["Sarojini Nagar", "India Gate"] },
-  "Lajpat Nagar|Chandni Chowk": { distance: 15, duration_road: 40, stops: ["Sarojini Nagar", "India Gate"] },
-  "Delhi|Agra": { distance: 206, duration_road: 180, stops: ["Mathura", "Vrindavan", "Faridabad", "Bharatpur"] },
-  "Delhi|Jaipur": { distance: 281, duration_road: 270, stops: ["Gurugram", "Alwar", "Behror", "Neemrana"] },
-  "Mumbai|Pune": { distance: 148, duration_road: 150, stops: ["Panvel", "Khopoli", "Lonavala", "Khandala"] },
-  "Mumbai|Goa": { distance: 594, duration_road: 720, stops: ["Pune", "Kolhapur", "Belgaum", "Panaji"] },
-  "Chennai|Bengaluru": { distance: 346, duration_road: 330, stops: ["Kanchipuram", "Vellore", "Krishnagiri", "Hosur"] },
-  "Kolkata|Puri": { distance: 500, duration_road: 480, stops: ["Bhubaneswar", "Cuttack", "Kharagpur", "Balasore"] },
-  "Hyderabad|Bengaluru": { distance: 570, duration_road: 540, stops: ["Kurnool", "Anantapur", "Chitradurga", "Tumkur"] },
-  "Jaipur|Udaipur": { distance: 393, duration_road: 360, stops: ["Kishangarh", "Ajmer", "Chittorgarh", "Rajsamand"] },
-  "DEFAULT": { distance: 250, duration_road: 240, stops: ["Waypoint A", "Waypoint B", "Waypoint C"] }
-};
-
-// Transport providers per mode
-const PROVIDERS = {
-  cab: [
-    { name: "Ola", emoji: "🟢", type: "Sedan", multiplier: 1.0 },
-    { name: "Uber", emoji: "⚫", type: "Go Sedan", multiplier: 1.05 },
-    { name: "Rapido", emoji: "🟡", type: "Cab+", multiplier: 0.88 },
-    { name: "InDrive", emoji: "🔵", type: "Economy", multiplier: 0.82 }
-  ],
-  bike: [
-    { name: "Rapido", emoji: "🟡", type: "Bike", multiplier: 1.0 },
-    { name: "Ola", emoji: "🟢", type: "Bike", multiplier: 1.08 },
-    { name: "Uber Moto", emoji: "⚫", type: "Moto", multiplier: 1.03 },
-    { name: "Bounce", emoji: "🟠", type: "Self-ride", multiplier: 0.75 }
-  ],
-  auto: [
-    { name: "Rapido Auto", emoji: "🟡", type: "Auto", multiplier: 1.0 },
-    { name: "Ola Auto", emoji: "🟢", type: "Auto", multiplier: 1.12 },
-    { name: "Uber Auto", emoji: "⚫", type: "Auto", multiplier: 1.07 },
-    { name: "Namma Yatri", emoji: "🔷", type: "Metered", multiplier: 0.9 }
-  ],
-  share: [
-    { name: "Ola Share", emoji: "🟢", type: "Carpool", multiplier: 0.55 },
-    { name: "Uber Pool", emoji: "⚫", type: "Pool", multiplier: 0.58 },
-    { name: "QuickRide", emoji: "🟣", type: "Carpool", multiplier: 0.45 },
-    { name: "BlaBlaCar", emoji: "🔵", type: "Long-haul", multiplier: 0.40 }
-  ]
-};
-
-// Destination data for Explore India section
-const DESTINATIONS = [
-  { name: "Taj Mahal", state: "Agra, UP", emoji: "🕌", desc: "Iconic white marble mausoleum and UNESCO World Heritage Site.", rating: "⭐ 4.9", category: "historical", grad: "grad-2" },
-  { name: "Hawa Mahal", state: "Jaipur, Rajasthan", emoji: "🏯", desc: "The magnificent 'Palace of Winds' with 953 intricately carved windows.", rating: "⭐ 4.8", category: "historical", grad: "grad-2" },
-  { name: "Kerala Backwaters", state: "Alleppey, Kerala", emoji: "🌊", desc: "Serene houseboat cruises through lush tropical backwaters.", rating: "⭐ 4.9", category: "nature", grad: "grad-3" },
-  { name: "Palolem Beach", state: "Goa", emoji: "🏖️", desc: "Stunning crescent beach with crystal clear waters and beach shacks.", rating: "⭐ 4.7", category: "beaches", grad: "grad-3" },
-  { name: "Valley of Flowers", state: "Uttarakhand", emoji: "🌸", desc: "A UNESCO site blooming with rare Himalayan wildflowers in monsoon.", rating: "⭐ 4.8", category: "mountains", grad: "grad-3" },
-  { name: "Varanasi Ghats", state: "Varanasi, UP", emoji: "🛕", desc: "Ancient city on the banks of Ganga; cradle of Indian civilisation.", rating: "⭐ 4.8", category: "religious", grad: "grad-4" },
-  { name: "Rohtang Pass", state: "Himachal Pradesh", emoji: "🏔️", desc: "Snow-capped high mountain pass with breathtaking Himalayan views.", rating: "⭐ 4.7", category: "mountains", grad: "grad-1" },
-  { name: "Hampi Ruins", state: "Karnataka", emoji: "🏛️", desc: "Magnificent ruins of the Vijayanagara Empire set in a surreal landscape.", rating: "⭐ 4.9", category: "historical", grad: "grad-2" },
-  { name: "Lakshmi Vilas Palace", state: "Vadodara, Gujarat", emoji: "🏰", desc: "Opulent palace four times the size of Buckingham Palace.", rating: "⭐ 4.6", category: "historical", grad: "grad-6" },
-  { name: "Radha Kund", state: "Mathura, UP", emoji: "🌿", desc: "Sacred kund associated with Radha-Krishna, surrounded by temples.", rating: "⭐ 4.7", category: "religious", grad: "grad-4" },
-  { name: "Dudhsagar Falls", state: "Goa-Karnataka", emoji: "💧", desc: "One of India's tallest waterfalls — a milky cascade through dense forest.", rating: "⭐ 4.8", category: "nature", grad: "grad-3" },
-  { name: "Chettinad Cuisine", state: "Tamil Nadu", emoji: "🍛", desc: "Legendary cuisine known for its bold spices and unique cooking techniques.", rating: "⭐ 5.0", category: "food", grad: "grad-6" },
-  { name: "Mysore Palace", state: "Mysuru, Karnataka", emoji: "✨", desc: "Ornate Indo-Saracenic palace lit by 97,000 bulbs during Dasara.", rating: "⭐ 4.8", category: "culture", grad: "grad-4" },
-  { name: "Munnar Tea Gardens", state: "Kerala", emoji: "🍃", desc: "Rolling hills blanketed with lush green tea plantations.", rating: "⭐ 4.7", category: "nature", grad: "grad-3" },
-  { name: "Golden Temple", state: "Amritsar, Punjab", emoji: "🌟", desc: "The holiest Sikh shrine — a spiritual and architectural masterpiece.", rating: "⭐ 5.0", category: "religious", grad: "grad-6" },
-  { name: "Rann of Kutch", state: "Gujarat", emoji: "🌅", desc: "Vast white salt desert, magical under a full moon.", rating: "⭐ 4.8", category: "nature", grad: "grad-5" }
-];
-
-// Discovery stops per known routes
-const DISCOVERY_STOPS = {
-  "Lajpat Nagar, Delhi|Chandni Chowk, Delhi": [
-    { name: "Sarojini Nagar", emoji: "🛍️", desc: "India's premier budget fashion market. Great local shopping experience.", dist: "~5 km from route", category: "Shopping", duration: "60 min", cost: 150 },
-    { name: "India Gate", emoji: "🏛️", desc: "Historic national war memorial surrounded by gardens and fountains.", dist: "~8 km from route", category: "Heritage", duration: "45 min", cost: 50 }
-  ],
-  "Lajpat Nagar|Chandni Chowk": [
-    { name: "Sarojini Nagar", emoji: "🛍️", desc: "India's premier budget fashion market. Great local shopping experience.", dist: "~5 km from route", category: "Shopping", duration: "60 min", cost: 150 },
-    { name: "India Gate", emoji: "🏛️", desc: "Historic national war memorial surrounded by gardens and fountains.", dist: "~8 km from route", category: "Heritage", duration: "45 min", cost: 50 }
-  ],
-  "Delhi|Agra": [
-    { name: "Mathura", emoji: "🛕", desc: "Birthplace of Lord Krishna; dotted with temples and ghats.", dist: "~50 km from route" },
-    { name: "Vrindavan", emoji: "🌸", desc: "Sacred town of temples, the playground of young Krishna.", dist: "~55 km from route" },
-    { name: "Faridabad", emoji: "🏙️", desc: "Industrial city with the ancient Baba Farid Dargah.", dist: "~40 km from route" },
-    { name: "Bharatpur", emoji: "🦅", desc: "Keoladeo National Park — a UNESCO bird sanctuary.", dist: "~15 km from route" }
-  ],
-  "Delhi|Jaipur": [
-    { name: "Neemrana Fort", emoji: "🏯", desc: "15th-century heritage fort-palace with stunning views.", dist: "~122 km from route" },
-    { name: "Alwar", emoji: "🌿", desc: "Gateway to Sariska Tiger Reserve and historic forts.", dist: "~160 km from route" },
-    { name: "Bhangarh Fort", emoji: "👻", desc: "India's 'most haunted' fort with striking Rajput architecture.", dist: "~175 km from route" }
-  ],
-  "Mumbai|Pune": [
-    { name: "Lonavala", emoji: "🌧️", desc: "Scenic hill station famous for chikki and monsoon waterfalls.", dist: "~8 km from route" },
-    { name: "Khandala", emoji: "🌄", desc: "Picturesque twin town with the iconic Rajmachi viewpoint.", dist: "~10 km from route" },
-    { name: "Karla Caves", emoji: "🗿", desc: "Ancient rock-cut Buddhist caves from the 2nd century BCE.", dist: "~18 km from route" }
-  ],
-  "DEFAULT": [
-    { name: "Heritage Stop", emoji: "🏛️", desc: "Historic site along the route worth exploring.", dist: "~30 km from route" },
-    { name: "Nature Escape", emoji: "🌿", desc: "Scenic natural area perfect for a short break.", dist: "~45 km from route" },
-    { name: "Local Flavour", emoji: "🍛", desc: "Renowned for local cuisine and street food.", dist: "~20 km from route" }
-  ]
-};
-
-/* ════════════════════════════════════════════════════════════════
-   APP STATE
-   ════════════════════════════════════════════════════════════════ */
 const state = {
   fromCity: '',
   toCity: '',
@@ -142,6 +43,7 @@ const state = {
   recentSearches: JSON.parse(localStorage.getItem('ll_recent') || '[]'),
   savedJourneys: [],             // loaded from Supabase DB after authentication
   apiData: null,                 // stores the real journey API response { distance, duration, weather, stops, safety }
+  routeData: null,               // stores active route metrics dynamically
 };
 
 
@@ -155,18 +57,7 @@ function showToast(msg, type = 'info', duration = 3000) {
   setTimeout(() => { toast.className = 'toast'; }, duration);
 }
 
-function getRouteKey(from, to) {
-  const key = `${from}|${to}`;
-  if (ROUTE_DATA[key]) return key;
-  const rev = `${to}|${from}`;
-  if (ROUTE_DATA[rev]) return rev;
-  return 'DEFAULT';
-}
 
-function getRouteData(from, to) {
-  const key = getRouteKey(from, to);
-  return ROUTE_DATA[key] || ROUTE_DATA['DEFAULT'];
-}
 
 function formatDuration(minutes) {
   if (minutes < 60) return `${minutes} min`;
@@ -484,10 +375,14 @@ async function triggerSearch() {
       if (journeyRes.ok) {
         apiData = await journeyRes.json();
       } else {
-        console.warn('Smart Journey API returned non-OK:', journeyRes.status);
+        throw new Error(`Smart Journey API error: ${journeyRes.status}`);
       }
     } else {
-      console.warn('Could not geocode one or both cities — falling back to mock data.');
+      throw new Error('Could not resolve coordinates for one or both locations. Please select real locations from the dropdown.');
+    }
+
+    if (!apiData) {
+      throw new Error('Unable to fetch route data. Please try again.');
     }
 
     state.apiData = apiData;
@@ -509,9 +404,10 @@ async function triggerSearch() {
   } catch (err) {
     console.error('triggerSearch failed:', err.message);
     state.apiData = null;
+    state.routeData = null;
     hideLoading();
-    renderResults(); // graceful fallback to mock data
-    showToast('⚠️ Live data unavailable — showing estimates', 'error', 4000);
+    document.getElementById('journey-results').style.display = 'none';
+    showToast(`⚠️ ${err.message || 'Live data unavailable'}`, 'error', 5000);
   }
 }
 
@@ -534,28 +430,22 @@ function renderResults() {
   const resultsEl = document.getElementById('journey-results');
   resultsEl.style.display = 'block';
 
-  // Build a routeData object from real API data if available, or fallback to mock
-  let routeData;
-  if (state.apiData) {
-    const apiDistKm = state.apiData.distance;
-    const apiDurMin = state.apiData.duration;
-    // Merge real data with mock ROUTE_DATA fallback structure
-    const mockFallback = getRouteData(state.fromCity, state.toCity);
-    routeData = {
-      distance: apiDistKm || mockFallback.distance,
-      duration_road: apiDurMin || mockFallback.duration_road,
-      stops: mockFallback.stops // Still use mock named stops for transport card stops list
-    };
-  } else {
-    routeData = getRouteData(state.fromCity, state.toCity);
-  }
+  if (!state.apiData) return;
+
+  const apiDistKm = state.apiData.distance;
+  const apiDurMin = state.apiData.duration;
+  
+  const routeData = {
+    distance: apiDistKm,
+    duration_road: apiDurMin,
+    stops: (state.apiData.stops || []).map(s => s.name)
+  };
+  state.routeData = routeData;
 
   // Header
   document.getElementById('result-from').textContent = state.fromCity;
   document.getElementById('result-to').textContent = state.toCity;
-  const distLabel = state.apiData
-    ? `${routeData.distance} km (OSRM)`
-    : `~${routeData.distance} km`;
+  const distLabel = `${routeData.distance} km (OSRM)`;
   document.getElementById('result-distance').textContent = distLabel;
   document.getElementById('result-date').textContent = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
@@ -565,50 +455,27 @@ function renderResults() {
   const budgetBadge = document.getElementById('budget-badge');
   const weatherBadge = document.getElementById('weather-badge');
 
-  if (state.apiData) {
-    const isGrok = state.apiData.grokAnalysis && state.apiData.grokAnalysis.grokAnalyzed;
-    
-    if (statusBadge) {
-      statusBadge.textContent = isGrok ? '🤖 AI-Analyzed' : '🟢 Live / API-sourced';
-      statusBadge.style.backgroundColor = isGrok ? 'var(--color-primary)' : 'var(--teal)';
-      statusBadge.style.color = 'white';
-    }
-    if (itineraryBadge) {
-      itineraryBadge.textContent = isGrok ? '🤖 AI-Analyzed' : '🟡 Estimated (Fallback)';
-      itineraryBadge.style.backgroundColor = isGrok ? 'var(--color-primary)' : 'var(--gray-100)';
-      itineraryBadge.style.color = isGrok ? 'white' : 'var(--gray-700)';
-    }
-    if (budgetBadge) {
-      budgetBadge.textContent = '🟡 Estimated (Fare Engine)';
-      budgetBadge.style.backgroundColor = 'var(--gray-100)';
-      budgetBadge.style.color = 'var(--gray-700)';
-    }
-    if (weatherBadge) {
-      weatherBadge.textContent = '🟢 Live — Open-Meteo';
-      weatherBadge.style.backgroundColor = 'var(--teal)';
-      weatherBadge.style.color = 'white';
-    }
-  } else {
-    if (statusBadge) {
-      statusBadge.textContent = '🟡 Estimated';
-      statusBadge.style.backgroundColor = 'var(--gray-100)';
-      statusBadge.style.color = 'var(--gray-700)';
-    }
-    if (itineraryBadge) {
-      itineraryBadge.textContent = '🟡 Estimated';
-      itineraryBadge.style.backgroundColor = 'var(--gray-100)';
-      itineraryBadge.style.color = 'var(--gray-700)';
-    }
-    if (budgetBadge) {
-      budgetBadge.textContent = '🟡 Estimated';
-      budgetBadge.style.backgroundColor = 'var(--gray-100)';
-      budgetBadge.style.color = 'var(--gray-700)';
-    }
-    if (weatherBadge) {
-      weatherBadge.textContent = '🟡 Estimated';
-      weatherBadge.style.backgroundColor = 'var(--gray-100)';
-      weatherBadge.style.color = 'var(--gray-700)';
-    }
+  const isGrok = state.apiData.grokAnalysis && state.apiData.grokAnalysis.grokAnalyzed;
+  
+  if (statusBadge) {
+    statusBadge.textContent = isGrok ? '🤖 AI-Analyzed' : '🟢 Live / API-sourced';
+    statusBadge.style.backgroundColor = isGrok ? 'var(--color-primary)' : 'var(--teal)';
+    statusBadge.style.color = 'white';
+  }
+  if (itineraryBadge) {
+    itineraryBadge.textContent = isGrok ? '🤖 AI-Analyzed' : '🟡 Estimated (Fallback)';
+    itineraryBadge.style.backgroundColor = isGrok ? 'var(--color-primary)' : 'var(--gray-100)';
+    itineraryBadge.style.color = isGrok ? 'white' : 'var(--gray-700)';
+  }
+  if (budgetBadge) {
+    budgetBadge.textContent = '🟡 Estimated (Fare Engine)';
+    budgetBadge.style.backgroundColor = 'var(--gray-100)';
+    budgetBadge.style.color = 'var(--gray-700)';
+  }
+  if (weatherBadge) {
+    weatherBadge.textContent = '🟢 Live — Open-Meteo';
+    weatherBadge.style.backgroundColor = 'var(--teal)';
+    weatherBadge.style.color = 'white';
   }
 
   // Reset mode to all
@@ -696,7 +563,7 @@ function showProviderComparison(mode) {
   document.getElementById('provider-title').textContent = `${modeLabels[mode] || mode} Fare Comparison`;
 
   const providers = PROVIDERS[mode] || PROVIDERS.cab;
-  const routeData = getRouteData(state.fromCity, state.toCity);
+  const routeData = state.routeData;
   const dist = routeData.distance;
 
   // Calculate base fare per mode
@@ -1091,7 +958,7 @@ function initFilters() {
         btn.setAttribute('aria-pressed', f.key === key);
       });
       state.currentFilter = key;
-      const routeData = getRouteData(state.fromCity, state.toCity);
+      const routeData = state.routeData;
       renderTransportCards(routeData);
     });
   });
@@ -1291,16 +1158,13 @@ window.removeStop = function(index) {
   const removedName = state.currentStops[index].name;
   state.currentStops.splice(index, 1);
   showToast(`Removed stop: ${removedName}`, 'info');
-  const routeData = getRouteData(state.fromCity, state.toCity);
+  const routeData = state.routeData;
   renderAllSubsections(routeData);
 };
 
 function renderDiscoveryGrid() {
-  // Prefer real API stops from OSM Overpass; fall back to curated mock data
-  const apiStops = state.apiData && state.apiData.stops ? state.apiData.stops : [];
-  const routeKey = getRouteKey(state.fromCity, state.toCity);
-  const mockDiscoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
-  const allDiscoveryStops = apiStops.length ? apiStops : mockDiscoveryStops;
+  // Prefer real API stops from OSM Overpass
+  const allDiscoveryStops = state.apiData && state.apiData.stops ? state.apiData.stops : [];
 
   const currentNames = state.currentStops.map(s => s.name.toLowerCase());
   const remaining = allDiscoveryStops.filter(s => !currentNames.includes(s.name.toLowerCase()));
@@ -1350,7 +1214,7 @@ window.addStopFromDiscovery = function(name, desc, emoji) {
   });
   state.currentStops.push(dest);
   showToast(`⭐ Added recommended stop: ${name}`, 'success');
-  const routeData = getRouteData(state.fromCity, state.toCity);
+  const routeData = state.routeData;
   renderAllSubsections(routeData);
 };
 
@@ -1657,7 +1521,7 @@ function renderBudgetEstimate(routeData) {
 
 window.updateBudgetLimit = function(val) {
   state.budgetLimit = parseInt(val) || 0;
-  const routeData = getRouteData(state.fromCity, state.toCity);
+  const routeData = state.routeData;
   renderBudgetEstimate(routeData);
 };
 
