@@ -7,6 +7,8 @@
 
 const USER_AGENT = 'LocalLenz/1.0 (prishaguliani28@gmail.com; travel-assistant)';
 
+const googlePlaces = require('./googlePlacesService');
+
 // Simple in-memory cache to avoid duplicate Overpass queries
 const queryCache = new Map();
 // Global rate limit backoff to prevent cascading 429s
@@ -27,8 +29,14 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 
 // Calculate the minimum distance from an attraction to any point on the route line
 function getDistanceFromRoute(attractionLat, attractionLon, routeGeometry) {
+  // A long route carries thousands of points; checking every one against every
+  // POI is enough work to blow the Workers CPU budget. Sampling to ~200 points
+  // keeps the nearest-point estimate accurate to well under a kilometre.
+  const step = Math.max(1, Math.floor(routeGeometry.length / 200));
+
   let minDistance = Infinity;
-  for (const point of routeGeometry) {
+  for (let i = 0; i < routeGeometry.length; i += step) {
+    const point = routeGeometry[i];
     const d = calculateHaversineDistance(attractionLat, attractionLon, point[0], point[1]);
     if (d < minDistance) minDistance = d;
   }
@@ -41,6 +49,15 @@ function getDistanceFromRoute(attractionLat, attractionLon, routeGeometry) {
  */
 async function discoverAlongRoute(routeGeometry) {
   if (!routeGeometry || routeGeometry.length < 2) return [];
+
+  // Preferred source: Google Places Nearby. Its three sample points run in
+  // parallel and return in about a second, where Overpass needs slow
+  // sequential calls and regularly times out or rate-limits.
+  const googleStops = await googlePlaces.discoverAlongRoute(
+    routeGeometry,
+    (lat, lon) => getDistanceFromRoute(lat, lon, routeGeometry)
+  );
+  if (googleStops && googleStops.length) return googleStops;
 
   // 1. Sample 3 points along the route (excluding start and end coordinates)
   // e.g. at 25%, 50%, and 75% of the total route line nodes
@@ -86,7 +103,7 @@ async function discoverAlongRoute(routeGeometry) {
       if (queryCache.has(query)) {
         data = queryCache.get(query);
       } else {
-        const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+        const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(20000) });
         if (res.status === 429) {
           console.warn('[Overpass] HTTP 429 Too Many Requests. Entering backoff for 60 seconds.');
           rateLimitResetTime = Date.now() + 60000;

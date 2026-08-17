@@ -312,6 +312,38 @@ function initSearch() {
   });
 }
 
+/**
+ * Resolve a typed place name to coordinates.
+ *
+ * Google city predictions carry no coordinates, so the top match may need a
+ * follow-up details lookup before it can be routed.
+ */
+async function geocodeToCoords(query) {
+  try {
+    const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
+    if (!res.ok) return null;
+
+    const results = await res.json();
+    if (!results || !results.length) return null;
+
+    const top = results[0];
+    if (top.lat != null && top.lon != null) {
+      return { lat: top.lat, lon: top.lon };
+    }
+
+    if (!top.placeId) return null;
+
+    const details = await fetch(`/api/place-details?placeId=${encodeURIComponent(top.placeId)}`);
+    if (!details.ok) return null;
+
+    const place = await details.json();
+    return (place.lat != null && place.lon != null) ? { lat: place.lat, lon: place.lon } : null;
+  } catch (err) {
+    console.error('Geocoding failed:', err.message);
+    return null;
+  }
+}
+
 async function triggerSearch() {
   const fromVal = document.getElementById('input-from').value.trim();
   const toVal = document.getElementById('input-to').value.trim();
@@ -362,24 +394,19 @@ async function triggerSearch() {
   });
 
   try {
-    // 1. Ensure we have coordinates for both cities
-    // Use stored coords from autocomplete dropdown if available, otherwise geocode now
-    if (!state.fromCoords) {
-      const fromResults = await fetch(`/api/geocode?q=${encodeURIComponent(fromVal)}`).then(r => r.json()).catch(() => []);
-      if (fromResults && fromResults.length) {
-        state.fromCoords = { lat: fromResults[0].lat, lon: fromResults[0].lon };
-      }
-    }
-    if (!state.toCoords) {
-      const toResults = await fetch(`/api/geocode?q=${encodeURIComponent(toVal)}`).then(r => r.json()).catch(() => []);
-      if (toResults && toResults.length) {
-        state.toCoords = { lat: toResults[0].lat, lon: toResults[0].lon };
-      }
-    }
+    // 1. Ensure we have coordinates for both cities.
+    // Coords are already set when a suggestion was picked; when the user just
+    // typed a name we geocode it here.
+    if (!state.fromCoords) state.fromCoords = await geocodeToCoords(fromVal);
+    if (!state.toCoords) state.toCoords = await geocodeToCoords(toVal);
 
     // 2. Call the real smart-journey API if we have coordinates
     let apiData = null;
-    if (state.fromCoords && state.toCoords) {
+    const haveCoords = state.fromCoords && state.toCoords
+      && state.fromCoords.lat != null && state.fromCoords.lon != null
+      && state.toCoords.lat != null && state.toCoords.lon != null;
+
+    if (haveCoords) {
       const params = new URLSearchParams({
         fromLat: state.fromCoords.lat,
         fromLon: state.fromCoords.lon,
@@ -1005,28 +1032,16 @@ function initJourneySubsections(routeData) {
           type = 'recommended';
           emoji = matchedApi.emoji || '⭐';
           desc = matchedApi.desc || 'Interesting place along the route';
-        } else {
-          // Fallback: check mock discovery stops
-          const routeKey = getRouteKey(state.fromCity, state.toCity);
-          const discoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
-          const matchedRec = discoveryStops.find(ds => ds.name.toLowerCase() === stopName.toLowerCase());
-          if (matchedRec) {
-            type = 'recommended';
-            emoji = matchedRec.emoji || '⭐';
-            desc = matchedRec.desc;
-          }
         }
+        // Anything else is a stop the user added themselves
       }
       return { name: stopName, type, emoji, desc };
     });
     // Clear restore list so subsequent searches start fresh
     state.restoreStopsList = null;
   } else {
-    // Use real API discovery stops if available, otherwise fall back to mock
-    const apiStops = state.apiData && state.apiData.stops ? state.apiData.stops : [];
-    const routeKey = getRouteKey(state.fromCity, state.toCity);
-    const mockDiscoveryStops = DISCOVERY_STOPS[routeKey] || DISCOVERY_STOPS['DEFAULT'];
-    const discoveryStops = apiStops.length ? apiStops : mockDiscoveryStops;
+    // Discovery stops come from the API; there is no mock list to fall back on
+    const discoveryStops = state.apiData && state.apiData.stops ? state.apiData.stops : [];
 
     state.currentStops = [
       { name: state.fromCity, type: 'start', emoji: '📍', desc: 'Starting point of your journey' }

@@ -210,7 +210,9 @@ function generateFallbackAnalysis(travelData) {
     tag: 'Arrival',
     tagColor: '#F59E0B',
     title: `Arrive at ${destination}`,
-    desc: `You have arrived safely! The weather at your destination is currently ${weather.temperature}°C and ${weather.condition.toLowerCase()}.`,
+    desc: weather && weather.temperature !== null && weather.temperature !== undefined
+      ? `You have arrived safely! The weather at your destination is currently ${weather.temperature}°C and ${weather.condition.toLowerCase()}.`
+      : 'You have arrived safely! Live weather is unavailable right now, so check conditions locally.',
     tips: ['Check local transit options', 'Find a nearby restaurant to taste regional delicacies']
   });
 

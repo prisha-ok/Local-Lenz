@@ -30,7 +30,7 @@ async function autocomplete(query) {
   const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&addressdetails=1&countrycodes=in`;
 
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`Nominatim error: ${res.statusText}`);
     
     const data = await res.json();
@@ -72,7 +72,7 @@ async function photonAutocomplete(query) {
   const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=12&lang=en`;
 
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`Photon error: ${res.statusText}`);
 
     const data = await res.json();
@@ -118,7 +118,7 @@ async function getRoute(fromLat, fromLon, toLat, toLon) {
   const url = `http://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson`;
 
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`OSRM error: ${res.statusText}`);
 
     const data = await res.json();

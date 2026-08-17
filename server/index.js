@@ -175,14 +175,16 @@ app.get('/api/journey', async (req, res, next) => {
       parseFloat(toLat), parseFloat(toLon)
     );
 
-    // 2. Query weather at destination coordinate
-    const weather = await weatherService.getWeather(parseFloat(toLat), parseFloat(toLon));
-
-    // 3. Query attractions along the OSRM route line
-    const stops = await placesService.discoverAlongRoute(route.geometry);
-
-    // 4. Retrieve emergency contact registry numbers
-    const safetyNumbers = await safetyService.getEmergencyNumbers(supabase);
+    // 2-4. Weather, attractions and helplines come from flaky third parties.
+    // Fetch them together and let any one fail without sinking the journey.
+    const [weather, stops, safetyNumbers] = await Promise.all([
+      weatherService.getWeather(parseFloat(toLat), parseFloat(toLon))
+        .catch(err => { console.error('Weather unavailable:', err.message); return weatherService.WEATHER_UNAVAILABLE; }),
+      placesService.discoverAlongRoute(route.geometry)
+        .catch(err => { console.error('Places unavailable:', err.message); return []; }),
+      safetyService.getEmergencyNumbers(supabase)
+        .catch(err => { console.error('Helplines unavailable:', err.message); return []; })
+    ]);
 
     res.json({
       distance: route.distance,
@@ -226,14 +228,16 @@ app.get('/api/smart-journey', async (req, res, next) => {
       parseFloat(toLat), parseFloat(toLon)
     );
 
-    // 2. Query weather at destination coordinate
-    const weather = await weatherService.getWeather(parseFloat(toLat), parseFloat(toLon));
-
-    // 3. Query attractions along the OSRM route line
-    const stops = await placesService.discoverAlongRoute(route.geometry);
-
-    // 4. Retrieve emergency contact registry numbers
-    const safetyNumbers = await safetyService.getEmergencyNumbers(supabase);
+    // 2-4. Weather, attractions and helplines come from flaky third parties.
+    // Fetch them together and let any one fail without sinking the journey.
+    const [weather, stops, safetyNumbers] = await Promise.all([
+      weatherService.getWeather(parseFloat(toLat), parseFloat(toLon))
+        .catch(err => { console.error('Weather unavailable:', err.message); return weatherService.WEATHER_UNAVAILABLE; }),
+      placesService.discoverAlongRoute(route.geometry)
+        .catch(err => { console.error('Places unavailable:', err.message); return []; }),
+      safetyService.getEmergencyNumbers(supabase)
+        .catch(err => { console.error('Helplines unavailable:', err.message); return []; })
+    ]);
 
     // 5. Generate realistic estimated fares context
     const fares = fareService.buildFareContext(route.distance, originName, destName);

@@ -168,11 +168,16 @@ async function handleApi(request, env) {
         parseFloat(toLat), parseFloat(toLon)
       );
 
-      // Weather, POIs and helplines are independent — fetch them together
+      // Weather, POIs and helplines are independent and all come from flaky
+      // third parties. Fetch them together, and let any one of them fail
+      // without taking the whole journey down with it.
       const [weather, stops, safetyNumbers] = await Promise.all([
-        weatherService.getWeather(parseFloat(toLat), parseFloat(toLon)),
-        placesService.discoverAlongRoute(route.geometry),
+        weatherService.getWeather(parseFloat(toLat), parseFloat(toLon))
+          .catch(err => { console.error('Weather unavailable:', err.message); return weatherService.WEATHER_UNAVAILABLE; }),
+        placesService.discoverAlongRoute(route.geometry)
+          .catch(err => { console.error('Places unavailable:', err.message); return []; }),
         safetyService.getEmergencyNumbers(supabase)
+          .catch(err => { console.error('Helplines unavailable:', err.message); return []; })
       ]);
 
       const base = {
@@ -224,8 +229,9 @@ async function handleApi(request, env) {
         }
       });
     } catch (err) {
+      // Only a failed route is fatal — everything else degrades above
       console.error('Journey processing failure:', err.message);
-      return bad('Could not build this journey. Please try again.', 502);
+      return bad('Could not find a road route between those points. Try nearby cities.', 502);
     }
   }
 

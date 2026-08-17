@@ -273,8 +273,134 @@ async function getPhotoUrl(photoName, maxWidth = 600) {
   }
 }
 
+
+// Type → the card styling the UI already expects for a stop
+const STOP_STYLE = {
+  tourist_attraction:  { category: 'historical', emoji: '🏛️' },
+  historical_landmark: { category: 'historical', emoji: '🏛️' },
+  hindu_temple:        { category: 'religious',  emoji: '🛕' },
+  mosque:              { category: 'religious',  emoji: '🕌' },
+  church:              { category: 'religious',  emoji: '⛪' },
+  place_of_worship:    { category: 'religious',  emoji: '🛕' },
+  museum:              { category: 'culture',    emoji: '🖼️' },
+  park:                { category: 'nature',     emoji: '🌿' },
+  national_park:       { category: 'nature',     emoji: '🌲' }
+};
+
+function styleFor(types) {
+  for (const t of types || []) {
+    if (STOP_STYLE[t]) return STOP_STYLE[t];
+  }
+  return { category: 'historical', emoji: '📍' };
+}
+
+/**
+ * Discover attractions along a route using Google Places Nearby Search.
+ *
+ * Overpass needs one slow sequential call per sample point and frequently
+ * times out or rate-limits; these three run in parallel and return in about
+ * a second, with real ratings and photos attached.
+ *
+ * @param {Array} routeGeometry  list of [lat, lon] along the route
+ * @param {Function} distanceFn  (lat, lon) => km from the route line
+ */
+async function discoverAlongRoute(routeGeometry, distanceFn) {
+  if (!isConfigured()) return null;
+  if (!routeGeometry || routeGeometry.length < 2) return [];
+
+  const len = routeGeometry.length;
+  const samples = len > 5
+    ? [0.25, 0.5, 0.75].map(f => routeGeometry[Math.floor(len * f)])
+    : [routeGeometry[Math.floor(len / 2)]];
+
+  const fieldMask = [
+    'places.id',
+    'places.displayName',
+    'places.location',
+    'places.rating',
+    'places.userRatingCount',
+    'places.types',
+    'places.editorialSummary',
+    'places.photos'
+  ].join(',');
+
+  const requests = samples.map(async point => {
+    const key = `stops:${point[0].toFixed(2)},${point[1].toFixed(2)}`;
+    const cached = cacheGet(key);
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/places:searchNearby`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey(),
+          'X-Goog-FieldMask': fieldMask
+        },
+        body: JSON.stringify({
+          includedTypes: ['tourist_attraction'],
+          maxResultCount: 10,
+          rankPreference: 'POPULARITY',
+          languageCode: 'en',
+          locationRestriction: {
+            circle: {
+              center: { latitude: point[0], longitude: point[1] },
+              radius: 20000
+            }
+          }
+        }),
+        signal: AbortSignal.timeout(12000)
+      });
+
+      if (!res.ok) throw new Error(`nearby ${res.status}`);
+
+      const data = await res.json();
+      const places = data.places || [];
+      cacheSet(key, places);
+      return places;
+    } catch (err) {
+      console.error('Google nearby search failed:', err.message);
+      return [];
+    }
+  });
+
+  const batches = await Promise.all(requests);
+
+  const byName = new Map();
+  for (const place of batches.flat()) {
+    const name = place.displayName && place.displayName.text;
+    if (!name || byName.has(name) || !place.location) continue;
+
+    const style = styleFor(place.types);
+    const distance = distanceFn(place.location.latitude, place.location.longitude);
+    const photo = place.photos && place.photos.length ? place.photos[0].name : null;
+
+    byName.set(name, {
+      name,
+      lat: place.location.latitude,
+      lon: place.location.longitude,
+      category: style.category,
+      emoji: style.emoji,
+      desc: (place.editorialSummary && place.editorialSummary.text)
+        || `A popular ${style.category} stop along your route.`,
+      distanceFromRoute: distance,
+      estimatedDetour: Math.round(distance * 4 + 10),
+      placeId: place.id,
+      rating: place.rating || null,
+      reviews: place.userRatingCount || 0,
+      photoUrl: photo ? `/api/place-photo?ref=${encodeURIComponent(photo)}` : null,
+      source: 'Google Places'
+    });
+  }
+
+  return Array.from(byName.values())
+    .sort((a, b) => a.distanceFromRoute - b.distanceFromRoute)
+    .slice(0, 6);
+}
+
 module.exports = {
   isConfigured,
+  discoverAlongRoute,
   autocompleteCities,
   getPlaceDetails,
   getDestinations,

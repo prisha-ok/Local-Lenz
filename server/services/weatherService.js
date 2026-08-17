@@ -98,6 +98,23 @@ async function getWeather(lat, lon) {
   }
 }
 
+// Returned when Open-Meteo is unreachable, so callers never see a null and
+// the AI/rule engine can still describe the journey.
+const WEATHER_UNAVAILABLE = {
+  temperature: null,
+  windspeed: null,
+  winddirection: null,
+  condition: 'Unavailable',
+  icon: '❓',
+  humidity: null,
+  precipitationProb: 0,
+  tempMax: null,
+  tempMin: null,
+  forecast: [],
+  unavailable: true
+};
+
 module.exports = {
+  WEATHER_UNAVAILABLE,
   getWeather
 };
