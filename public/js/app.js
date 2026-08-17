@@ -188,30 +188,47 @@ function setupAutocomplete(inputId, dropdownId, stateKey) {
         if (!matches || !matches.length) { closeDropdown(dropdown); return; }
         
         dropdown.innerHTML = matches.map(item =>
-          `<div class="ac-item" tabindex="0" role="option" data-name="${item.name.replace(/'/g, "\\'")}" data-lat="${item.lat}" data-lon="${item.lon}">
+          `<div class="ac-item" tabindex="0" role="option" data-name="${escapeHtml(item.name)}" data-lat="${item.lat}" data-lon="${item.lon}" data-place-id="${escapeHtml(item.placeId || '')}">
              <span class="ac-icon">📍</span>
              <div style="display:flex; flex-direction:column; text-align:left;">
-               <span style="font-weight:600; font-size:13px; color:var(--gray-900); line-height:1.2;">${item.name}</span>
-               <span style="font-size:10px; color:var(--gray-400); margin-top:2px;">${item.fullName}</span>
+               <span style="font-weight:600; font-size:13px; color:var(--gray-900); line-height:1.2;">${escapeHtml(item.name)}</span>
+               <span style="font-size:10px; color:var(--gray-400); margin-top:2px;">${escapeHtml(item.fullName)}</span>
              </div>
            </div>`
         ).join('');
         
         dropdown.classList.add('open');
         dropdown.querySelectorAll('.ac-item').forEach(item => {
-          item.addEventListener('click', () => {
+          item.addEventListener('click', async () => {
             const name = item.dataset.name;
             input.value = name;
             state[stateKey] = name;
-            
-            // Store coordinates in state
+
             const coordKey = stateKey === 'fromCity' ? 'fromCoords' : 'toCoords';
-            state[coordKey] = {
-              lat: parseFloat(item.dataset.lat),
-              lon: parseFloat(item.dataset.lon)
-            };
-            
+            const lat = parseFloat(item.dataset.lat);
+            const lon = parseFloat(item.dataset.lon);
+            const placeId = item.dataset.placeId;
+
             closeDropdown(dropdown);
+
+            if (!isNaN(lat) && !isNaN(lon)) {
+              state[coordKey] = { lat, lon };
+              return;
+            }
+
+            // Google city predictions carry no coordinates — resolve them now
+            state[coordKey] = null;
+            if (!placeId) return;
+
+            try {
+              const res = await fetch(`/api/place-details?placeId=${encodeURIComponent(placeId)}`);
+              if (!res.ok) throw new Error('Place details lookup failed');
+              const details = await res.json();
+              state[coordKey] = { lat: details.lat, lon: details.lon };
+            } catch (err) {
+              console.error('Could not resolve coordinates:', err.message);
+              showToast('Could not pin that location. Try another suggestion.', 'error');
+            }
           });
           item.addEventListener('keydown', e => {
             if (e.key === 'Enter') item.click();

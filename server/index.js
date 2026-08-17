@@ -44,8 +44,8 @@ if (supabaseUrl && supabaseAnonKey) {
 app.use(cors());
 app.use(express.json());
 
-// Serve static frontend files directly from project root
-app.use(express.static(path.join(__dirname, '..')));
+// Serve the frontend from public/ only — never the project root
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Rate Limiter: Prevent abuse of external API queries
 const apiLimiter = rateLimit({
@@ -102,6 +102,19 @@ app.get('/api/geocode', async (req, res, next) => {
   try {
     const suggestions = await geoService.autocomplete(query);
     res.json(suggestions);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── 2A. API: PLACE DETAILS (coordinates for a picked suggestion) ─
+app.get('/api/place-details', async (req, res, next) => {
+  const placeId = req.query.placeId;
+  if (!placeId) return res.status(400).json({ error: 'Query parameter "placeId" is required' });
+  try {
+    const details = await googlePlaces.getPlaceDetails(placeId);
+    if (!details) return res.status(404).json({ error: 'Place details unavailable' });
+    res.json(details);
   } catch (err) {
     next(err);
   }

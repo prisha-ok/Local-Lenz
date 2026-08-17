@@ -10,21 +10,43 @@
 
 'use strict';
 
-const { GoogleGenAI } = require('@google/genai');
+// Gemini is called over plain REST so this runs unchanged on Node and on
+// Cloudflare Workers, where the Node SDK and module-scope env are unavailable.
+const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// Initialize Gemini client
-let gemini = null;
-const apiKey = process.env.GEMINI_API_KEY;
+function geminiKey() {
+  const key = (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) || '';
+  return (key && key !== 'your_gemini_api_key_from_aistudio.google.com') ? key : '';
+}
 
-if (apiKey && apiKey !== 'your_gemini_api_key_from_aistudio.google.com') {
-  try {
-    gemini = new GoogleGenAI({ apiKey });
-    console.log('Local Lenz Backend: AI service initialized successfully with Google Gemini 3.5 Flash.');
-  } catch (err) {
-    console.error('Local Lenz Backend: Failed to initialize Gemini client:', err.message);
+/**
+ * Single Gemini generateContent call returning parsed JSON.
+ */
+async function callGemini(model, prompt) {
+  const res = await fetch(`${GEMINI_ENDPOINT}/${model}:generateContent?key=${geminiKey()}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
+    })
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`${res.status} ${detail.slice(0, 160)}`);
   }
-} else {
-  console.warn('Local Lenz Backend: GEMINI_API_KEY missing or default in .env. AI will operate in fallback rule-based mode.');
+
+  const data = await res.json();
+  const text = data.candidates
+    && data.candidates[0]
+    && data.candidates[0].content
+    && data.candidates[0].content.parts
+    && data.candidates[0].content.parts[0]
+    && data.candidates[0].content.parts[0].text;
+
+  if (!text) throw new Error('Gemini returned an empty candidate');
+  return JSON.parse(text.trim());
 }
 
 /**
@@ -37,8 +59,8 @@ if (apiKey && apiKey !== 'your_gemini_api_key_from_aistudio.google.com') {
 async function analyzeJourney(travelData) {
   const { origin, destination, distance, duration, weather, stops, fares } = travelData;
 
-  // 1. If Gemini isn't initialized, use local fallback intelligence engine
-  if (!gemini) {
+  // 1. No key configured — use the local fallback intelligence engine
+  if (!geminiKey()) {
     return generateFallbackAnalysis(travelData);
   }
 
@@ -82,22 +104,12 @@ Fare options (estimated): ${JSON.stringify(fares.options.filter(o => o.available
 Generate 3-5 logical itinerary steps based on the actual attractions and route. Output ONLY the raw JSON.`;
 
   // Model fallback chain — try in order until one succeeds
-  const MODELS = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite'];
+  const MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
 
   for (const model of MODELS) {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const response = await gemini.models.generateContent({
-          model,
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            temperature: 0.2,
-          }
-        });
-
-        const text = response.text.trim();
-        const result = JSON.parse(text);
+        const result = await callGemini(model, prompt);
 
         result.grokAnalyzed = true;
         result.dataStatus  = 'ai-analyzed';
@@ -106,6 +118,12 @@ Generate 3-5 logical itinerary steps based on the actual attractions and route. 
         return result;
 
       } catch (err) {
+        // Quota exhausted — no model will succeed, stop immediately
+        if (err.message && err.message.includes('429')) {
+          console.warn('Gemini quota exceeded. Using rule-based fallback.');
+          return generateFallbackAnalysis(travelData);
+        }
+
         const is503 = err.message && (err.message.includes('503') || err.message.includes('UNAVAILABLE') || err.message.includes('overload'));
         const is404 = err.message && (err.message.includes('404') || err.message.includes('NOT_FOUND') || err.message.includes('no longer available'));
 
