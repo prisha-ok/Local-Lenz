@@ -214,7 +214,7 @@ app.get('/api/smart-journey', async (req, res, next) => {
         weatherProvider: 'Open-Meteo (API-sourced)',
         placesProvider: 'OpenStreetMap Overpass API (API-sourced)',
         fareProvider: 'Local Lenz Fare Engine (Estimated)',
-        grokProvider: grokAnalysis.grokAnalyzed ? 'xAI Grok (AI-analyzed)' : 'Local Lenz Intelligence (Rule-based estimated)'
+        grokProvider: grokAnalysis.grokAnalyzed ? `Google Gemini (${grokAnalysis.aiProvider || 'AI-analyzed'})` : 'Local Lenz Intelligence (Rule-based estimated)'
       }
     });
 

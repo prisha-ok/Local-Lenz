@@ -1,60 +1,66 @@
 /* ════════════════════════════════════════════════════════════════
-   LOCAL LENZ — grokService.js
-   Intelligent Travel Recommendation & Synthesis Layer using Grok.
-   
+   LOCAL LENZ — grokService.js  (Powered by Google Gemini)
+   Intelligent Travel Recommendation & Synthesis Layer.
+
    Architecture:
    Receives verified API-sourced data (OSRM route, weather, OSM stops)
    and fare calculations, then synthesizes them into an optimized
-   travel recommendation and custom itinerary.
+   travel recommendation and custom itinerary using Gemini 2.0 Flash.
    ════════════════════════════════════════════════════════════════ */
 
 'use strict';
 
-const { OpenAI } = require('openai');
+const { GoogleGenAI } = require('@google/genai');
 
-// Initialize OpenAI client pointing to xAI's API
-let openai = null;
-const apiKey = process.env.XAI_API_KEY;
+// Initialize Gemini client
+let gemini = null;
+const apiKey = process.env.GEMINI_API_KEY;
 
-if (apiKey && apiKey !== 'your_xai_api_key_from_console.x.ai') {
+if (apiKey && apiKey !== 'your_gemini_api_key_from_aistudio.google.com') {
   try {
-    openai = new OpenAI({
-      apiKey: apiKey,
-      baseURL: 'https://api.x.ai/v1'
-    });
-    console.log('Local Lenz Backend: AI service initialized successfully with xAI Grok.');
+    gemini = new GoogleGenAI({ apiKey });
+    console.log('Local Lenz Backend: AI service initialized successfully with Google Gemini 3.5 Flash.');
   } catch (err) {
-    console.error('Local Lenz Backend: Failed to initialize Grok client:', err.message);
+    console.error('Local Lenz Backend: Failed to initialize Gemini client:', err.message);
   }
 } else {
-  console.warn('Local Lenz Backend: XAI_API_KEY missing or default in .env. Grok will operate in fallback mock analysis mode.');
+  console.warn('Local Lenz Backend: GEMINI_API_KEY missing or default in .env. AI will operate in fallback rule-based mode.');
 }
 
 /**
- * Synthesizes route, weather, POIs, and fares using Grok chat completion.
- * Falls back to rule-based JSON if Grok client is not configured or fails.
- * 
+ * Synthesizes route, weather, POIs, and fares using Gemini 2.0 Flash.
+ * Falls back to rule-based JSON if Gemini client is not configured or fails.
+ *
  * @param {object} travelData - object containing route, weather, safety, and fare context
  * @returns {Promise<object>} structured analysis response
  */
 async function analyzeJourney(travelData) {
   const { origin, destination, distance, duration, weather, stops, fares } = travelData;
 
-  // 1. If Grok isn't initialized, use local fallback intelligence engine immediately
-  if (!openai) {
+  // 1. If Gemini isn't initialized, use local fallback intelligence engine
+  if (!gemini) {
     return generateFallbackAnalysis(travelData);
   }
 
-  // 2. Build the system prompt
-  const systemPrompt = `You are Local Lenz, an expert Indian travel assistant.
-Your job is to analyze real-time/API-sourced travel data and generate a structured JSON recommendation.
-You must output ONLY a valid JSON object matching the schema below. Do not include markdown code block formatting (like \`\`\`json) or any pre/post text. Just return the raw JSON string.
+  // 2. Build the prompt
+  const prompt = `You are Local Lenz, an expert Indian travel assistant AI.
+Analyze the following real-time/API-sourced travel data and generate a structured JSON recommendation.
+You MUST output ONLY a valid raw JSON object — no markdown, no code fences, no extra text.
 
-Output Schema:
+=== TRIP DATA ===
+Origin: ${origin}
+Destination: ${destination}
+OSRM Route Distance: ${distance.toFixed(1)} km
+OSRM Road Duration: ${Math.round(duration)} minutes
+Destination Weather: ${weather.temperature}°C, ${weather.condition}, Wind ${weather.windSpeed} km/h
+Attractions along route: ${JSON.stringify(stops.map(s => ({ name: s.name, type: s.type, distance: s.distance })))}
+Fare options (estimated): ${JSON.stringify(fares.options.filter(o => o.available).map(o => ({ mode: o.mode, fareDisplay: o.fareDisplay })))}
+
+=== OUTPUT SCHEMA (return ONLY this JSON) ===
 {
   "recommended": {
-    "mode": "train" | "cab" | "bus" | "metro" | "bike" | "auto" | "walk",
-    "reason": "A 2-3 sentence personalized explanation of why this mode is recommended based on the OSRM distance, weather conditions, safety, and travel cost."
+    "mode": "metro" | "cab" | "bus" | "train" | "bike" | "auto" | "walk",
+    "reason": "2-3 sentence explanation referencing distance, weather, cost, and local context."
   },
   "itinerary": [
     {
@@ -62,65 +68,80 @@ Output Schema:
       "icon": "🚀",
       "tag": "Departure",
       "tagColor": "#3B82F6",
-      "title": "Depart from [Origin]",
-      "desc": "Actionable start tips.",
+      "title": "Depart from ${origin}",
+      "desc": "Actionable departure tip.",
       "tips": ["Tip 1", "Tip 2"]
-    },
-    ... (generate 3-5 logical steps based on the actual stops along the route provided in the user prompt)
+    }
   ],
   "budgetSuggestion": {
-    "advice": "Grok's smart advice on how to keep costs low on this route, referencing the fares provided."
+    "advice": "Smart budget advice specific to this route, referencing the fares provided."
   },
-  "discoveryAdvice": "A brief sentence summarizing the attractions along the route and when to stop."
-}`;
+  "discoveryAdvice": "One sentence about top attractions along this specific route."
+}
 
-  // 3. Build user prompt with actual travel data
-  const userPrompt = `Analyze this trip:
-Origin: ${origin}
-Destination: ${destination}
-OSRM Route Distance: ${distance.toFixed(1)} km
-OSRM Route Road Duration: ${Math.round(duration)} minutes
-Destination Weather: ${weather.temperature}°C, ${weather.condition}, Wind ${weather.windSpeed} km/h
-Attractions Discovered along route: ${JSON.stringify(stops.map(s => ({ name: s.name, type: s.type, distance: s.distance })))}
-Estimated Fare Context: ${JSON.stringify(fares.options.filter(o => o.available))}
+Generate 3-5 logical itinerary steps based on the actual attractions and route. Output ONLY the raw JSON.`;
 
-Remember, you are the intelligence layer. Do not invent coordinates or base route parameters. Use the provided fares and OSRM route metrics.
-Generate the optimal route recommendation, budget advice, and dynamic itinerary now. Output ONLY raw JSON.`;
+  // Model fallback chain — try in order until one succeeds
+  const MODELS = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite'];
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'grok-4.6',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.2,
-      response_format: { type: "json_object" }
-    });
+  for (const model of MODELS) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await gemini.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            temperature: 0.2,
+          }
+        });
 
-    const content = response.choices[0].message.content.trim();
-    const result = JSON.parse(content);
-    
-    // Add metadata marking that it was analyzed by Grok
-    result.grokAnalyzed = true;
-    result.dataStatus = 'ai-analyzed';
-    return result;
+        const text = response.text.trim();
+        const result = JSON.parse(text);
 
-  } catch (err) {
-    console.error('Grok analysis query failed, using rule-based fallback:', err.message);
-    return generateFallbackAnalysis(travelData);
+        result.grokAnalyzed = true;
+        result.dataStatus  = 'ai-analyzed';
+        result.aiProvider  = `Google Gemini (${model})`;
+        console.log(`Gemini success: model=${model}, attempt=${attempt}`);
+        return result;
+
+      } catch (err) {
+        const is503 = err.message && (err.message.includes('503') || err.message.includes('UNAVAILABLE') || err.message.includes('overload'));
+        const is404 = err.message && (err.message.includes('404') || err.message.includes('NOT_FOUND') || err.message.includes('no longer available'));
+
+        if (is404) {
+          // This model doesn't exist — skip to next model immediately
+          console.warn(`Gemini model ${model} not available, trying next.`);
+          break;
+        }
+
+        if (is503 && attempt < 3) {
+          // Temporary overload — wait and retry same model
+          const waitMs = attempt * 3000; // 3s, then 6s
+          console.warn(`Gemini ${model} overloaded (attempt ${attempt}), retrying in ${waitMs}ms...`);
+          await new Promise(r => setTimeout(r, waitMs));
+          continue;
+        }
+
+        // Unknown error or max retries — try next model
+        console.error(`Gemini ${model} failed (attempt ${attempt}): ${err.message}`);
+        break;
+      }
+    }
   }
+
+  console.error('All Gemini models failed. Using rule-based fallback.');
+  return generateFallbackAnalysis(travelData);
 }
 
 /**
- * Fallback analyzer if Grok API is unavailable/unconfigured.
+ * Fallback analyzer if Gemini API is unavailable/unconfigured.
  * Uses deterministic rules to provide a structured recommendation.
  */
 function generateFallbackAnalysis(travelData) {
   const { origin, destination, distance, weather, stops, fares } = travelData;
   const isIntercity = distance > 50;
 
-  // Determine recommendation rule-based
   let recommendedMode = 'cab';
   let reason = '';
 
@@ -141,9 +162,7 @@ function generateFallbackAnalysis(travelData) {
     }
   }
 
-  // Create a structured itinerary
   const itinerary = [];
-  const totalStops = stops.length;
 
   itinerary.push({
     time: '08:00 AM',
@@ -155,11 +174,9 @@ function generateFallbackAnalysis(travelData) {
     tips: ['Keep your offline map ready', 'Charge your phone to 100%', 'Share route with family']
   });
 
-  // Mid stops
   stops.slice(0, 3).forEach((stop, i) => {
-    const timeStr = `${9 + i}:30 AM`;
     itinerary.push({
-      time: timeStr,
+      time: `${9 + i}:30 AM`,
       icon: '📍',
       tag: 'Sightseeing',
       tagColor: '#8B5CF6',
@@ -180,21 +197,19 @@ function generateFallbackAnalysis(travelData) {
   });
 
   return {
-    recommended: {
-      mode: recommendedMode,
-      reason: reason
-    },
-    itinerary: itinerary,
+    recommended: { mode: recommendedMode, reason },
+    itinerary,
     budgetSuggestion: {
-      advice: isIntercity 
-        ? 'Book train tickets in advance via IRCTC to secure lower fares. Cabs will cost significantly more.' 
+      advice: isIntercity
+        ? 'Book train tickets in advance via IRCTC to secure lower fares. Cabs will cost significantly more.'
         : 'Choose Metro or Auto Rickshaw over private cabs to save up to 60% on your commute.'
     },
-    discoveryAdvice: totalStops > 0 
-      ? `We found ${totalStops} attractions along your route. We recommend stopping at ${stops[0].name} for a break.`
+    discoveryAdvice: stops.length > 0
+      ? `We found ${stops.length} attractions along your route. We recommend stopping at ${stops[0].name} for a break.`
       : 'Keep an eye out for local tea stalls and landmarks along the road.',
     grokAnalyzed: false,
-    dataStatus: 'estimated'
+    dataStatus: 'estimated',
+    aiProvider: 'Local Lenz Rule Engine (fallback)'
   };
 }
 
