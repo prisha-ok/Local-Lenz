@@ -958,8 +958,9 @@ function initFilters() {
         btn.setAttribute('aria-pressed', f.key === key);
       });
       state.currentFilter = key;
-      const routeData = state.routeData;
-      renderTransportCards(routeData);
+      // No search run yet — nothing to re-sort
+      if (!state.routeData) return;
+      renderTransportCards(state.routeData);
     });
   });
 }
@@ -1648,32 +1649,100 @@ function initExplore() {
     state.currentCategory = tab.dataset.cat;
     renderDestinations(state.currentCategory);
   });
+
+  // Clicking a destination card drops it straight into the destination field
+  document.getElementById('destinations-grid').addEventListener('click', e => {
+    const card = e.target.closest('.dest-card');
+    if (!card) return;
+
+    const name = card.dataset.name;
+    const lat  = parseFloat(card.dataset.lat);
+    const lon  = parseFloat(card.dataset.lon);
+
+    document.getElementById('input-to').value = name;
+    state.toCity = name;
+    state.toCoords = (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null;
+
+    showToast(`${name} set as your destination`, 'success');
+    document.getElementById('hero').scrollIntoView({ behavior: 'smooth' });
+  });
 }
 
-function renderDestinations(category) {
-  const filtered = category === 'all' ? DESTINATIONS : DESTINATIONS.filter(d => d.category === category);
+// Presentation only — the destination data itself comes from Google Places
+const CATEGORY_STYLE = {
+  all:        { emoji: '🌏', grad: 'grad-1' },
+  historical: { emoji: '🏛️', grad: 'grad-2' },
+  mountains:  { emoji: '🏔️', grad: 'grad-3' },
+  beaches:    { emoji: '🏖️', grad: 'grad-4' },
+  religious:  { emoji: '🛕', grad: 'grad-5' },
+  nature:     { emoji: '🌿', grad: 'grad-6' },
+  food:       { emoji: '🍛', grad: 'grad-1' },
+  culture:    { emoji: '🎭', grad: 'grad-2' }
+};
+
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+const destinationsCache = {};
+
+async function renderDestinations(category) {
   const grid = document.getElementById('destinations-grid');
-  if (!filtered.length) {
-    grid.innerHTML = '<p style="text-align:center;color:var(--gray-400);grid-column:1/-1;padding:40px">More destinations coming soon! 🌏</p>';
+  const style = CATEGORY_STYLE[category] || CATEGORY_STYLE.all;
+
+  if (destinationsCache[category]) {
+    paintDestinations(destinationsCache[category], style);
     return;
   }
-  grid.innerHTML = filtered.map(d => `
-    <div class="dest-card" onclick="showToast('Exploring ${d.name}! 🌟', 'success')">
-      <div class="dest-card-img ${d.grad}">
-        <span>${d.emoji}</span>
-        <div class="dest-card-tag">${capitalize(d.category)}</div>
+
+  grid.innerHTML = '<p style="text-align:center;color:var(--gray-400);grid-column:1/-1;padding:40px">Loading live destinations…</p>';
+
+  try {
+    const res = await fetch(`/api/destinations?category=${encodeURIComponent(category)}`);
+    if (!res.ok) throw new Error('Destination lookup failed');
+    const data = await res.json();
+    const list = data.destinations || [];
+
+    if (!list.length) {
+      grid.innerHTML = `<p style="text-align:center;color:var(--gray-400);grid-column:1/-1;padding:40px">${escapeHtml(data.message || 'No destinations found for this category yet. 🌏')}</p>`;
+      return;
+    }
+
+    destinationsCache[category] = list;
+    paintDestinations(list, style);
+  } catch (err) {
+    console.error('Destinations failed:', err.message);
+    grid.innerHTML = '<p style="text-align:center;color:var(--gray-400);grid-column:1/-1;padding:40px">Could not load destinations right now. Please try again. 🌏</p>';
+  }
+}
+
+function paintDestinations(list, style) {
+  const grid = document.getElementById('destinations-grid');
+  grid.innerHTML = list.map(d => {
+    const photo = d.photoUrl
+      ? `style="background-image:url('${escapeHtml(d.photoUrl)}');background-size:cover;background-position:center;"`
+      : '';
+    const reviews = d.reviews ? ` (${Number(d.reviews).toLocaleString()})` : '';
+
+    return `
+    <div class="dest-card" data-name="${escapeHtml(d.name)}" data-lat="${d.lat}" data-lon="${d.lon}" style="cursor:pointer">
+      <div class="dest-card-img ${style.grad}" ${photo}>
+        ${d.photoUrl ? '' : `<span>${style.emoji}</span>`}
+        <div class="dest-card-tag">${escapeHtml(capitalize(d.category || 'all'))}</div>
       </div>
       <div class="dest-card-body">
-        <div class="dest-card-name">${d.name}</div>
-        <div class="dest-card-state">📍 ${d.state}</div>
-        <div class="dest-card-desc">${d.desc}</div>
+        <div class="dest-card-name">${escapeHtml(d.name)}</div>
+        <div class="dest-card-state">📍 ${escapeHtml(d.state)}</div>
+        <div class="dest-card-desc">${escapeHtml(d.desc)}</div>
         <div class="dest-card-footer">
-          <span class="dest-card-rating">${d.rating}</span>
-          <button class="btn-dest-explore" onclick="event.stopPropagation(); showToast('Exploring ${d.name}! 🌟', 'success')">Explore</button>
+          <span class="dest-card-rating">${escapeHtml(d.rating)}${reviews}</span>
+          <button class="btn-dest-explore" type="button">Plan Trip</button>
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 function capitalize(str) { return str.charAt(0).toUpperCase() + str.slice(1); }
@@ -2038,18 +2107,30 @@ function initThemeToggle() {
    BOOT
    ════════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
-  initSupabase();        // ← Supabase: must run first to restore session
-  initThemeToggle();
-  initNavbar();
-  initParticles();
-  initAutocomplete();
-  initGeolocation();
-  initSearch();
-  initModeSelector();
-  initFilters();
-  initExplore();
-  initSafety();
-  initAuth();
-  initScrollReveal();
-  initSmoothScroll();
+  // Each section boots independently — a failure in one must never leave the
+  // rest of the page's buttons unwired.
+  const bootSteps = [
+    ['Supabase',      initSupabase],   // must run first to restore session
+    ['Theme toggle',  initThemeToggle],
+    ['Navbar',        initNavbar],
+    ['Particles',     initParticles],
+    ['Autocomplete',  initAutocomplete],
+    ['Geolocation',   initGeolocation],
+    ['Search',        initSearch],
+    ['Mode selector', initModeSelector],
+    ['Filters',       initFilters],
+    ['Explore',       initExplore],
+    ['Safety',        initSafety],
+    ['Auth',          initAuth],
+    ['Scroll reveal', initScrollReveal],
+    ['Smooth scroll', initSmoothScroll]
+  ];
+
+  bootSteps.forEach(([name, fn]) => {
+    try {
+      fn();
+    } catch (err) {
+      console.error(`Local Lenz: "${name}" failed to initialise —`, err);
+    }
+  });
 });

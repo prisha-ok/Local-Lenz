@@ -19,6 +19,7 @@ const placesService = require('./services/placesService');
 const safetyService = require('./services/safetyService');
 const fareService = require('./services/fareService');
 const grokService = require('./services/grokService');
+const googlePlaces = require('./services/googlePlacesService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -87,7 +88,8 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    databaseConnected: !!supabase
+    databaseConnected: !!supabase,
+    googlePlacesConfigured: googlePlaces.isConfigured()
   });
 });
 
@@ -102,6 +104,45 @@ app.get('/api/geocode', async (req, res, next) => {
     res.json(suggestions);
   } catch (err) {
     next(err);
+  }
+});
+
+// ── 2B. API: EXPLORE DESTINATIONS (Google Cloud Places) ─────────
+app.get('/api/destinations', async (req, res, next) => {
+  const category = req.query.category || 'all';
+  try {
+    const destinations = await googlePlaces.getDestinations(category);
+
+    if (!destinations) {
+      // Key missing or Google call failed — tell the client honestly
+      return res.json({
+        destinations: [],
+        provider: 'unavailable',
+        message: googlePlaces.isConfigured()
+          ? 'Google Places request failed. Please try again.'
+          : 'Live destinations need GOOGLE_MAPS_API_KEY in your environment.'
+      });
+    }
+
+    res.json({ destinations, provider: 'google', category });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── 2C. API: PLACE PHOTO PROXY ──────────────────────────────────
+// Resolves a Google photo reference server-side so the API key never
+// reaches the browser.
+app.get('/api/place-photo', async (req, res) => {
+  const ref = req.query.ref;
+  if (!ref) return res.status(400).json({ error: 'Query parameter "ref" is required' });
+
+  try {
+    const url = await googlePlaces.getPhotoUrl(ref);
+    if (!url) return res.status(404).json({ error: 'Photo unavailable' });
+    res.redirect(302, url);
+  } catch (err) {
+    res.status(502).json({ error: 'Photo lookup failed' });
   }
 });
 
