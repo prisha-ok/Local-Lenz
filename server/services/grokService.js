@@ -22,7 +22,7 @@ if (apiKey && apiKey !== 'your_xai_api_key_from_console.x.ai') {
       apiKey: apiKey,
       baseURL: 'https://api.x.ai/v1'
     });
-    console.log('Local Lenz Backend: Grok AI service initialized successfully.');
+    console.log('Local Lenz Backend: AI service initialized successfully with xAI Grok.');
   } catch (err) {
     console.error('Local Lenz Backend: Failed to initialize Grok client:', err.message);
   }
@@ -89,7 +89,7 @@ Generate the optimal route recommendation, budget advice, and dynamic itinerary 
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'grok-beta',
+      model: 'grok-4.6',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }

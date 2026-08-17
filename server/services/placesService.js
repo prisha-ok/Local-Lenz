@@ -7,6 +7,11 @@
 
 const USER_AGENT = 'LocalLenz/1.0 (prishaguliani28@gmail.com; travel-assistant)';
 
+// Simple in-memory cache to avoid duplicate Overpass queries
+const queryCache = new Map();
+// Global rate limit backoff to prevent cascading 429s
+let rateLimitResetTime = 0;
+
 // Simple Haversine distance calculator between two coordinates (in km)
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Earth radius in km
@@ -70,10 +75,34 @@ async function discoverAlongRoute(routeGeometry) {
     const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-      if (!res.ok) throw new Error(`Overpass API error: ${res.statusText}`);
-      
-      const data = await res.json();
+      // Check global rate limit
+      if (Date.now() < rateLimitResetTime) {
+        console.warn(`[Overpass] Rate limited. Skipping point [${lat}, ${lon}]`);
+        continue;
+      }
+
+      let data;
+      // Check cache
+      if (queryCache.has(query)) {
+        data = queryCache.get(query);
+      } else {
+        const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+        if (res.status === 429) {
+          console.warn('[Overpass] HTTP 429 Too Many Requests. Entering backoff for 60 seconds.');
+          rateLimitResetTime = Date.now() + 60000;
+          break; // Stop fetching remaining points
+        }
+        if (!res.ok) throw new Error(`Overpass API error: ${res.statusText}`);
+        
+        data = await res.json();
+        // Save to cache
+        queryCache.set(query, data);
+        if (queryCache.size > 100) queryCache.delete(queryCache.keys().next().value);
+        
+        // Respectful delay between external calls if not cached
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+
       if (!data.elements) continue;
 
       for (const el of data.elements) {
