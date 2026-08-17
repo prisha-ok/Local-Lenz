@@ -84,10 +84,16 @@ async function autocompleteCities(query) {
 
     const results = places.map(p => {
       const address = p.formattedAddress || '';
-      // "Agra, Uttar Pradesh, India" → region = "Uttar Pradesh"
-      const parts  = address.split(',').map(s => s.trim()).filter(Boolean);
-      const region = parts.length >= 2 ? parts[parts.length - 2] : '';
-      const name   = (p.displayName && p.displayName.text) || parts[0] || query;
+      // "Agra, Uttar Pradesh, India" → region "Uttar Pradesh", country "India".
+      // With regionCode IN, Google often drops the country: "Jaipur, Rajasthan".
+      const parts   = address.split(',').map(s => s.trim()).filter(Boolean);
+      const last    = parts.length ? parts[parts.length - 1] : '';
+      const hasCountry = /^india$/i.test(last);
+      const country = hasCountry ? last : 'India';
+      const region  = hasCountry
+        ? (parts.length >= 2 ? parts[parts.length - 2] : '')
+        : (parts.length >= 2 ? last : '');
+      const name    = (p.displayName && p.displayName.text) || parts[0] || query;
 
       return {
         name: region && !name.includes(region) ? `${name}, ${region}` : name,
@@ -96,7 +102,7 @@ async function autocompleteCities(query) {
         lon: p.location ? p.location.longitude : null,
         placeId: p.id,
         region,
-        country: parts.length ? parts[parts.length - 1] : 'India',
+        country,
         provider: 'google'
       };
     }).filter(r => r.lat !== null && r.lon !== null);
