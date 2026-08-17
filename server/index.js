@@ -475,10 +475,14 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: msg });
 });
 
-// Start listening
-app.listen(PORT, () => {
-  console.log(`===================================================`);
-  console.log(`Local Lenz server running at: http://localhost:${PORT}`);
-  console.log(`Serving static files from project root directory.`);
-  console.log(`===================================================`);
-});
+// Start listening (only if run directly, not imported as a serverless function)
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`===================================================`);
+    console.log(`Local Lenz server running at: http://localhost:${PORT}`);
+    console.log(`Serving static files from project root directory.`);
+    console.log(`===================================================`);
+  });
+}
+
+module.exports = app;
