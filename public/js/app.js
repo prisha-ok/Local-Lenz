@@ -6,27 +6,6 @@
 
 'use strict';
 
-/* ════════════════════════════════════════════════════════════════
-   MOCK DATA
-   NOTE: Replace these with real API calls in production.
-   Suggested integrations:
-   - Transport: IRCTC API, RedBus API, Ola API, Uber API, Rapido API
-   - Geolocation: Google Maps Geocoding API
-   - Places: Google Places API
-   ════════════════════════════════════════════════════════════════ */
-
-const INDIAN_CITIES = [
-  "Agra", "Ahmedabad", "Ajmer", "Allahabad", "Amritsar", "Aurangabad",
-  "Bengaluru", "Bhopal", "Bhubaneswar", "Chandigarh", "Chennai",
-  "Coimbatore", "Delhi", "Dehradun", "Goa", "Guwahati", "Gurugram",
-  "Hyderabad", "Indore", "Jaipur", "Jaisalmer", "Jammu", "Jodhpur",
-  "Kanpur", "Kochi", "Kolkata", "Lucknow", "Ludhiana", "Madurai",
-  "Mangaluru", "Mumbai", "Mysuru", "Nagpur", "Nashik", "Noida",
-  "Patna", "Pune", "Raipur", "Rajkot", "Ranchi", "Shimla", "Siliguri",
-  "Surat", "Thiruvananthapuram", "Udaipur", "Varanasi", "Vijayawada",
-  "Visakhapatnam", "Vrindavan", "Mathura", "Lajpat Nagar, Delhi", "Chandni Chowk, Delhi"
-];
-
 const state = {
   fromCity: '',
   toCity: '',
@@ -622,18 +601,21 @@ function initModeSelector() {
 
     state.currentMode = mode;
 
-    if (mode === 'all' || mode === 'train' || mode === 'bus') {
-      // Show transport overview cards
+    if (mode === 'all') {
       document.getElementById('provider-comparison').style.display = 'none';
       document.getElementById('transport-overview').style.display = 'block';
-      if (mode !== 'all') {
-        // Filter the transport cards to just this mode
-        filterTransportCardsByMode(mode);
-      } else {
-        document.querySelectorAll('.transport-card').forEach(c => c.style.display = 'block');
-      }
+      document.querySelectorAll('.transport-card').forEach(c => c.style.display = 'block');
+    } else if (mode === 'train') {
+      document.getElementById('transport-overview').style.display = 'none';
+      showTrainInfo();
+    } else if (mode === 'bus') {
+      document.getElementById('transport-overview').style.display = 'none';
+      showBusInfo();
+    } else if (mode === 'metro') {
+      document.getElementById('transport-overview').style.display = 'none';
+      showMetroInfo();
     } else {
-      // Show provider comparison
+      // cab / bike / auto / share
       document.getElementById('transport-overview').style.display = 'none';
       showProviderComparison(mode);
     }
@@ -655,78 +637,116 @@ function resetModeSelector() {
   document.querySelectorAll('.transport-card').forEach(c => c.style.display = 'block');
 }
 
-function filterTransportCardsByMode(mode) {
-  document.querySelectorAll('.transport-card').forEach(c => {
-    c.style.display = c.classList.contains(mode) ? 'block' : 'none';
-  });
+/* ════════════════════════════════════════════════════════════════
+   MODE DETAIL PANELS
+   Every panel here is built from state.apiData.fares — the real,
+   distance-driven Local Lenz Fare Engine output — never a fabricated
+   provider list. Where a genuine no-signup external link exists
+   (Google Maps, Uber's public deep link, IRCTC, RedBus) we use it, and
+   nowhere else claims to "open" or "book" anything it can't.
+   ════════════════════════════════════════════════════════════════ */
+
+// Real, no-API-key-required links. Nothing here is fabricated — Google Maps
+// directions always work, and Uber's rider deep link is publicly documented
+// (https://developer.uber.com/docs/riders/ride-requests/tutorials/deep-links).
+function mapsDirectionsUrl(travelMode) {
+  const { fromCoords: a, toCoords: b } = state;
+  if (!a || !b) return null;
+  const mode = { driving: 'driving', transit: 'transit', walking: 'walking' }[travelMode] || 'driving';
+  return `https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lon}&destination=${b.lat},${b.lon}&travelmode=${mode}`;
 }
 
-/* ════════════════════════════════════════════════════════════════
-   PROVIDER FARE COMPARISON
-   ════════════════════════════════════════════════════════════════ */
+function uberDeepLink() {
+  const { fromCoords: a, toCoords: b } = state;
+  if (!a || !b) return null;
+  return `https://m.uber.com/ul/?action=setPickup`
+    + `&pickup[latitude]=${a.lat}&pickup[longitude]=${a.lon}`
+    + `&dropoff[latitude]=${b.lat}&dropoff[longitude]=${b.lon}`;
+}
+
+function citySlug(name) {
+  return (name || '').toLowerCase().trim().split(',')[0].replace(/\s+/g, '-');
+}
+
+function openLink(url, label) {
+  if (!url) {
+    showToast('Set a starting point and destination first.', 'error');
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
+  showToast(`Opening ${label}…`, 'info', 2000);
+}
+
+function getFareOption(mode) {
+  const options = state.apiData && state.apiData.fares && state.apiData.fares.options;
+  return options ? options.find(o => o.mode === mode) : null;
+}
+
+/* ── CAB / BIKE / AUTO / SHARE ────────────────────────────────── */
 function showProviderComparison(mode) {
   const compEl = document.getElementById('provider-comparison');
   compEl.style.display = 'block';
 
   const modeLabels = { cab: 'Cab', bike: 'Bike Taxi', auto: 'Auto Rickshaw', share: 'Share Cab / Carpool' };
   const modeIcons = { cab: '🚕', bike: '🏍️', auto: '🛺', share: '🚐' };
-
   document.getElementById('provider-mode-icon').textContent = modeIcons[mode] || '🚗';
-  document.getElementById('provider-title').textContent = `${modeLabels[mode] || mode} Fare Comparison`;
-
-  const providers = PROVIDERS[mode] || PROVIDERS.cab;
-  const routeData = state.routeData;
-  const dist = routeData.distance;
-
-  // Calculate base fare per mode
-  let baseFare;
-  if (mode === 'cab') baseFare = calcCabFare(dist);
-  else if (mode === 'bike') baseFare = calcBikeFare(dist);
-  else if (mode === 'auto') baseFare = calcAutoFare(dist);
-  else baseFare = Math.round(dist * 7); // share cab
-
-  // Build provider fare objects
-  const fares = providers.map(p => ({
-    ...p,
-    fare: Math.round(baseFare * p.multiplier),
-    eta: randBetween(2, 8), // minutes away
-    duration: Math.round(routeData.duration_road + randBetween(-15, 15))
-  }));
-
-  // Sort by fare
-  fares.sort((a, b) => a.fare - b.fare);
-  const lowestFare = fares[0].fare;
+  document.getElementById('provider-title').textContent = `${modeLabels[mode] || mode} Fare Estimate`;
 
   const grid = document.getElementById('provider-cards-grid');
-  grid.innerHTML = fares.map((p, i) => `
-    <div class="provider-card${p.fare === lowestFare ? ' lowest' : ''}" data-provider="${p.name}">
-      ${p.fare === lowestFare ? '<div class="lowest-badge">🏆 LOWEST FARE</div>' : ''}
+
+  // "Share" isn't a fareService option — carpooling is consistently cheaper
+  // than a private cab, so it's derived from the same real cab estimate
+  // rather than inventing an unrelated number.
+  const cabOption = getFareOption('cab');
+  const option = mode === 'share' && cabOption
+    ? {
+        ...cabOption,
+        fare: Math.round(cabOption.fare * 0.55),
+        fareDisplay: `~₹${Math.round(cabOption.fare * 0.55)}`,
+        fareNote: 'Shared/carpool estimate, derived from the cab fare estimate.'
+      }
+    : getFareOption(mode);
+
+  if (!option) {
+    const message = state.apiData
+      ? `${modeLabels[mode] || mode} isn't practical for a ${state.routeData.distance} km route.`
+      : 'Plan a journey first to see a fare estimate for this mode.';
+    grid.innerHTML = `<div class="provider-card" style="grid-column:1/-1;text-align:center;padding:30px;">
+      <p style="color:var(--gray-500);">${message}</p>
+    </div>`;
+    compEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+
+  const dirUrl = mapsDirectionsUrl('driving');
+  const uberUrl = mode === 'cab' ? uberDeepLink() : null;
+
+  grid.innerHTML = `
+    <div class="provider-card lowest" style="grid-column:1/-1;">
+      <div class="lowest-badge">🟡 ESTIMATED FARE</div>
       <div class="provider-logo-row">
-        <span class="provider-emoji">${p.emoji}</span>
+        <span class="provider-emoji">${modeIcons[mode] || '🚗'}</span>
         <div class="provider-name-col">
-          <span class="provider-name">${p.name}</span>
-          <span class="provider-type">${p.type}</span>
+          <span class="provider-name">${option.provider || modeLabels[mode]}</span>
+          <span class="provider-type">Local Lenz Fare Engine</span>
         </div>
       </div>
-      <div class="provider-fare">₹${p.fare.toLocaleString('en-IN')}<span> approx</span></div>
+      <div class="provider-fare">${option.fareDisplay}</div>
       <div class="provider-meta-row">
-        <span class="provider-meta-item">⏱ ${formatDuration(p.duration)}</span>
-        <span class="provider-meta-item">🛵 ${p.eta} min away</span>
+        <span class="provider-meta-item">📏 ${state.routeData.distance} km</span>
       </div>
-      <button class="btn-book-provider" onclick="handleBookProvider('${p.name}', '${mode}', ${p.fare})">
-        ${p.fare === lowestFare ? '✓ Book Best Price' : `Book with ${p.name}`}
-      </button>
+      <p style="font-size:0.8rem;color:var(--gray-500);margin-top:8px;">${option.fareNote || ''}</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+        <button class="btn-book-provider" onclick="openLink('${dirUrl}', 'Google Maps directions')">
+          🧭 Get Directions
+        </button>
+        ${uberUrl ? `<button class="btn-book-provider" onclick="openLink('${uberUrl}', 'Uber')">Open Uber</button>` : ''}
+      </div>
     </div>
-  `).join('');
+  `;
 
-  // Scroll to comparison
   compEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
-
-window.handleBookProvider = function(provider, mode, fare) {
-  // In production: deep link to respective app or affiliate link
-  showToast(`Opening ${provider}… (Production: deep-link to ${provider} app)`, 'info', 3000);
-};
 
 /* ════════════════════════════════════════════════════════════════
    TRANSPORT CARDS (All Overview)
@@ -965,91 +985,138 @@ window.handleTransportAction = function(type) {
     showMetroInfo();
     document.getElementById('mode-selector-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } else if (type === 'train') {
-    showToast('🚆 In production: connects to IRCTC / Rail API', 'info', 3000);
+    showTrainInfo();
+    document.getElementById('mode-selector-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } else if (type === 'bus') {
-    showToast('🚌 In production: connects to RedBus / State Transport API', 'info', 3000);
+    showBusInfo();
+    document.getElementById('mode-selector-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 };
 
+/* ── METRO ─────────────────────────────────────────────────────── */
 function showMetroInfo() {
   const compEl = document.getElementById('provider-comparison');
   compEl.style.display = 'block';
   document.getElementById('transport-overview').style.display = 'none';
   document.getElementById('provider-mode-icon').textContent = '🚇';
-  document.getElementById('provider-title').textContent = 'Delhi Metro — Route Info';
+  document.getElementById('provider-title').textContent = 'Metro Fare Estimate';
 
-  const isDelhi = (state.fromCity.toLowerCase().includes('delhi') || state.toCity.toLowerCase().includes('delhi'));
-
+  const option = getFareOption('metro');
   const grid = document.getElementById('provider-cards-grid');
-  if (isDelhi) {
-    grid.innerHTML = `
-      <div class="provider-card lowest" style="grid-column:1/-1;">
-        <div class="lowest-badge">🚇 RECOMMENDED ROUTE</div>
-        <div class="provider-logo-row">
-          <span class="provider-emoji">🔵</span>
-          <div class="provider-name-col">
-            <span class="provider-name">Delhi Metro Rail Corporation (DMRC)</span>
-            <span class="provider-type">Yellow Line / Blue Line</span>
-          </div>
-        </div>
-        <div class="provider-fare">₹40<span> approx</span></div>
-        <div class="provider-meta-row">
-          <span class="provider-meta-item">⏱ 35 min</span>
-          <span class="provider-meta-item">🏪 Interchange at Rajiv Chowk</span>
-          <span class="provider-meta-item">🕐 First train: 5:30 AM</span>
-        </div>
-        <div style="padding:12px 16px;font-size:0.85rem;color:var(--gray-600);background:rgba(0,0,0,0.03);border-radius:8px;margin-top:8px;line-height:1.6;">
-          <strong>Sample Route:</strong> Lajpat Nagar (Violet Line) → Central Secretariat → Chawri Bazar (Yellow Line) → Chandni Chowk<br>
-          <span style="color:var(--color-accent);font-size:0.8rem;">⚠️ Sample data — verify on DMRC website or app for actual fares and schedules.</span>
-        </div>
-        <button class="btn-book-provider" onclick="showToast('Opening DMRC official app… (Production: deep-link)', 'info', 3000)">
-          ✓ View on DMRC App
-        </button>
-      </div>
-      <div class="provider-card">
-        <div class="provider-logo-row">
-          <span class="provider-emoji">🟠</span>
-          <div class="provider-name-col">
-            <span class="provider-name">Rapid Metro / Airport Line</span>
-            <span class="provider-type">Orange Line</span>
-          </div>
-        </div>
-        <div class="provider-fare">₹60<span> approx</span></div>
-        <div class="provider-meta-row">
-          <span class="provider-meta-item">⏱ 20 min (Airport Express)</span>
-          <span class="provider-meta-item">🛄 Luggage storage available</span>
-        </div>
-        <button class="btn-book-provider" onclick="showToast('Airport Express info: check DMRC. (Sample data)', 'info', 3000)">
-          View Airport Express
-        </button>
-      </div>
-      <div class="provider-card">
-        <div class="provider-logo-row">
-          <span class="provider-emoji">🟣</span>
-          <div class="provider-name-col">
-            <span class="provider-name">Magenta Line / Pink Line</span>
-            <span class="provider-type">Phase III Corridors</span>
-          </div>
-        </div>
-        <div class="provider-fare">₹30–₹55<span> approx</span></div>
-        <div class="provider-meta-row">
-          <span class="provider-meta-item">⏱ 25–40 min</span>
-          <span class="provider-meta-item">♿ Accessible stations</span>
-        </div>
-        <button class="btn-book-provider" onclick="showToast('Check DMRC app for Magenta/Pink Line stops. (Sample)', 'info', 3000)">
-          View Line Details
-        </button>
-      </div>
-    `;
-  } else {
+
+  if (!option || !option.available) {
     grid.innerHTML = `
       <div class="provider-card" style="grid-column:1/-1;text-align:center;padding:30px;">
         <div style="font-size:2rem;margin-bottom:12px;">🚇</div>
-        <p style="font-size:1rem;color:var(--gray-600);">Metro is available in Delhi, Mumbai, Bengaluru, Hyderabad, Chennai &amp; Kolkata.</p>
-        <p style="font-size:0.85rem;color:var(--gray-400);margin-top:8px;">Select a city route to view metro line information. (Sample data)</p>
+        <p style="font-size:1rem;color:var(--gray-600);">
+          ${option ? (option.fareNote || 'Metro is not available for this route.') : 'Plan a journey first to check metro availability.'}
+        </p>
       </div>
     `;
+    compEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
   }
+
+  const transitUrl = mapsDirectionsUrl('transit');
+  grid.innerHTML = `
+    <div class="provider-card lowest" style="grid-column:1/-1;">
+      <div class="lowest-badge">🟡 ESTIMATED FARE</div>
+      <div class="provider-logo-row">
+        <span class="provider-emoji">🚇</span>
+        <div class="provider-name-col">
+          <span class="provider-name">${option.provider}</span>
+        </div>
+      </div>
+      <div class="provider-fare">${option.fareDisplay}</div>
+      <p style="font-size:0.8rem;color:var(--gray-500);margin-top:8px;">${option.fareNote}</p>
+      <button class="btn-book-provider" onclick="openLink('${transitUrl}', 'Google Maps transit directions')">
+        🧭 Get Transit Directions
+      </button>
+    </div>
+  `;
+  compEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ── TRAIN ─────────────────────────────────────────────────────── */
+function showTrainInfo() {
+  const compEl = document.getElementById('provider-comparison');
+  compEl.style.display = 'block';
+  document.getElementById('transport-overview').style.display = 'none';
+  document.getElementById('provider-mode-icon').textContent = '🚆';
+  document.getElementById('provider-title').textContent = 'Train Fare Estimate';
+
+  const option = getFareOption('train');
+  const grid = document.getElementById('provider-cards-grid');
+
+  if (!option) {
+    grid.innerHTML = `<div class="provider-card" style="grid-column:1/-1;text-align:center;padding:30px;">
+      <p style="color:var(--gray-500);">Plan a journey first to see a train fare estimate.</p>
+    </div>`;
+    compEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+
+  const bd = option.fareBreakdown || {};
+  grid.innerHTML = `
+    <div class="provider-card lowest" style="grid-column:1/-1;">
+      <div class="lowest-badge">🟡 ESTIMATED FARE</div>
+      <div class="provider-logo-row">
+        <span class="provider-emoji">🚆</span>
+        <div class="provider-name-col"><span class="provider-name">${option.provider}</span></div>
+      </div>
+      <div class="provider-meta-row">
+        <span class="provider-meta-item">Sleeper ${bd.sleeper || ''}</span>
+        <span class="provider-meta-item">3AC ${bd.threeAC || ''}</span>
+        <span class="provider-meta-item">2AC ${bd.twoAC || ''}</span>
+      </div>
+      <p style="font-size:0.8rem;color:var(--gray-500);margin-top:8px;">${option.fareNote}</p>
+      <button class="btn-book-provider" onclick="openLink('https://www.irctc.co.in/nget/train-search', 'IRCTC train search')">
+        🎫 Search Trains on IRCTC
+      </button>
+    </div>
+  `;
+  compEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ── BUS ───────────────────────────────────────────────────────── */
+function showBusInfo() {
+  const compEl = document.getElementById('provider-comparison');
+  compEl.style.display = 'block';
+  document.getElementById('transport-overview').style.display = 'none';
+  document.getElementById('provider-mode-icon').textContent = '🚌';
+  document.getElementById('provider-title').textContent = 'Bus Fare Estimate';
+
+  const option = getFareOption('bus');
+  const grid = document.getElementById('provider-cards-grid');
+
+  if (!option) {
+    grid.innerHTML = `<div class="provider-card" style="grid-column:1/-1;text-align:center;padding:30px;">
+      <p style="color:var(--gray-500);">Plan a journey first to see a bus fare estimate.</p>
+    </div>`;
+    compEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+
+  const bd = option.fareBreakdown || {};
+  const redbusUrl = `https://www.redbus.in/bus-tickets/${citySlug(state.fromCity)}-to-${citySlug(state.toCity)}`;
+  grid.innerHTML = `
+    <div class="provider-card lowest" style="grid-column:1/-1;">
+      <div class="lowest-badge">🟡 ESTIMATED FARE</div>
+      <div class="provider-logo-row">
+        <span class="provider-emoji">🚌</span>
+        <div class="provider-name-col"><span class="provider-name">${option.provider}</span></div>
+      </div>
+      <div class="provider-meta-row">
+        <span class="provider-meta-item">Non-AC ${bd.nonAC || ''}</span>
+        <span class="provider-meta-item">AC ${bd.ac || ''}</span>
+        <span class="provider-meta-item">Volvo ${bd.volvo || ''}</span>
+      </div>
+      <p style="font-size:0.8rem;color:var(--gray-500);margin-top:8px;">${option.fareNote}</p>
+      <button class="btn-book-provider" onclick="openLink('${redbusUrl}', 'RedBus')">
+        🎫 Search Buses on RedBus
+      </button>
+    </div>
+  `;
   compEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
