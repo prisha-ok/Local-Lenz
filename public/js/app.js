@@ -673,7 +673,17 @@ function openLink(url, label) {
     showToast('Set a starting point and destination first.', 'error');
     return;
   }
-  window.open(url, '_blank', 'noopener');
+  // window.open(url, '_blank', <features>) makes some browsers spawn a
+  // stripped popup window (no address bar) instead of a normal tab, and it
+  // can sit blank while the destination loads. An anchor click always opens
+  // a real tab.
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   showToast(`Opening ${label}…`, 'info', 2000);
 }
 
