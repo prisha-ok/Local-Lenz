@@ -39,9 +39,10 @@ function showToast(msg, type = 'info', duration = 3000) {
 
 
 function formatDuration(minutes) {
-  if (minutes < 60) return `${minutes} min`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
+  const total = Math.round(minutes);
+  if (total < 60) return `${total} min`;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
@@ -785,10 +786,10 @@ function renderTransportCards(routeData) {
       let note = '';
 
       if (mode === 'metro') {
-        durationStr = isDelhi ? '35 min' : '45 min';
+        durationStr = formatDuration(roadTime * 1.3); // transit + walk/interchange time
         badge = 'Economical';
         action = 'View Metro Info';
-        note = isDelhi ? 'Yellow & Blue Lines' : 'Local Transit';
+        note = 'Local transit';
       } else if (mode === 'train') {
         durationStr = formatDuration(roadTime * 0.7);
         badge = 'Best Value';
@@ -836,7 +837,10 @@ function renderTransportCards(routeData) {
         distance: `${dist.toFixed(1)} km`,
         badge: badge,
         action: action,
-        note: opt.fareNote || note,
+        // `note` holds a short per-mode label sized for the compact "Class"
+        // box (e.g. "Sleeper • 3AC • 2AC"); opt.fareNote is a full sentence
+        // meant for the detail panel below and overflows this box badly.
+        note: note || opt.fareNote || '',
         available: opt.available
       };
     }).filter(c => c.available !== false); // hide unavailable modes
