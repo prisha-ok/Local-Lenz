@@ -262,6 +262,74 @@ function closeDropdown(el) {
 }
 
 /* ════════════════════════════════════════════════════════════════
+   SHARING
+   ════════════════════════════════════════════════════════════════ */
+
+// A link that reopens the app on this exact journey
+function buildShareUrl() {
+  const url = new URL(window.location.origin + window.location.pathname);
+  if (state.fromCity) url.searchParams.set('from', state.fromCity);
+  if (state.toCity) url.searchParams.set('to', state.toCity);
+  return url.toString();
+}
+
+/**
+ * Share via the native share sheet where available, otherwise copy to
+ * clipboard. Both are real — no placeholder toast.
+ */
+async function shareContent(title, text, url) {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text, url });
+      showToast('Shared successfully', 'success');
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // user dismissed the sheet
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    showToast('Link copied to clipboard', 'success');
+  } catch (err) {
+    window.prompt('Copy this link:', url);
+  }
+}
+
+function shareJourney() {
+  if (!state.fromCity || !state.toCity) {
+    showToast('Plan a journey first, then share it.', 'error');
+    return;
+  }
+  shareContent(
+    'Local Lenz journey',
+    `My trip from ${state.fromCity} to ${state.toCity} —`,
+    buildShareUrl()
+  );
+}
+
+function shareLiveLocation() {
+  if (!navigator.geolocation) {
+    showToast('Location is not supported on this device.', 'error');
+    return;
+  }
+
+  showToast('Getting your location…', 'info', 2000);
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      shareContent(
+        'My live location',
+        'I am here right now —',
+        `https://www.google.com/maps?q=${latitude},${longitude}`
+      );
+    },
+    err => showToast(`Could not get your location: ${err.message}`, 'error'),
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
    GEOLOCATION
    ════════════════════════════════════════════════════════════════ */
 function initGeolocation() {
@@ -1798,12 +1866,14 @@ function initSafety() {
     if (e.target === sosModal) sosModal.style.display = 'none';
   };
 
-  // Share journey
+  // Share journey — native share sheet, clipboard fallback
   document.querySelectorAll('#btn-share-journey, .btn-share-journey').forEach(el => {
-    el.onclick = () => {
-      showToast('📤 Journey shared with trusted contacts! (Production: uses Web Share API)', 'success', 3000);
-    };
+    el.onclick = shareJourney;
   });
+
+  // Share live location from the women's safety panel
+  const shareLocationBtn = document.getElementById('wp-share-location');
+  if (shareLocationBtn) shareLocationBtn.onclick = shareLiveLocation;
 
   // Trusted Contact
   const trustedBtn = document.getElementById('btn-trusted-contact');

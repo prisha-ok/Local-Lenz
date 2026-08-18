@@ -60,7 +60,10 @@ app.use('/api/', apiLimiter);
 // ── JWT AUTHENTICATION MIDDLEWARE ──────────────────────────────
 async function authMiddleware(req, res, next) {
   if (!supabase) {
-    // Graceful fallback for local development without DB configured
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Account features are temporarily unavailable.' });
+    }
+    // Local development without DB configured — never in production
     req.user = { id: 'mock-user-id', email: 'dev@locallenz.com' };
     return next();
   }
