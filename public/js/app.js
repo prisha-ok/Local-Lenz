@@ -1750,7 +1750,8 @@ function initExplore() {
     renderDestinations(state.currentCategory);
   });
 
-  // Clicking a destination card drops it straight into the destination field
+  // "Plan Trip" on a destination card should actually plan the trip, not
+  // just drop you back at an empty-looking search box.
   document.getElementById('destinations-grid').addEventListener('click', e => {
     const card = e.target.closest('.dest-card');
     if (!card) return;
@@ -1763,8 +1764,19 @@ function initExplore() {
     state.toCity = name;
     state.toCoords = (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null;
 
-    showToast(`${name} set as your destination`, 'success');
+    const fromInput = document.getElementById('input-from');
+    const hasOrigin = fromInput.value.trim().length > 0;
+
     document.getElementById('hero').scrollIntoView({ behavior: 'smooth' });
+
+    if (hasOrigin) {
+      showToast(`Planning your trip to ${name}…`, 'success');
+      // Let the scroll settle before the results section jumps again
+      setTimeout(() => triggerSearch(), 500);
+    } else {
+      showToast(`${name} set as your destination — add a starting point`, 'success');
+      setTimeout(() => fromInput.focus(), 500);
+    }
   });
 }
 

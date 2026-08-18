@@ -368,6 +368,11 @@ button { cursor: pointer; border: none; background: none; font-family: inherit; 
   overflow: hidden;
   background: var(--white);
 }
+/* overflow:hidden above clips backgrounds to the rounded corners, but it
+   also clips the autocomplete dropdown — on desktop's short single-row
+   layout the dropdown is entirely invisible even though it's populated.
+   Open it up only while a suggestion list is actually showing. */
+.search-fields:has(.autocomplete-dropdown.open) { overflow: visible; }
 
 .search-field {
   flex: 1; display: flex; align-items: center; gap: 12px;
