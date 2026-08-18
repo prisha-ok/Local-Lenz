@@ -199,6 +199,30 @@ const CATEGORY_QUERIES = {
   culture:    'cultural heritage sites in India'
 };
 
+
+// Google place type → the Explore category it should be tagged with.
+// Order matters: checked top to bottom, first match wins.
+const DESTINATION_TYPE_MAP = [
+  [['beach'], 'beaches'],
+  [['hindu_temple', 'mosque', 'church', 'synagogue', 'place_of_worship'], 'religious'],
+  [['national_park', 'park', 'hiking_area', 'wildlife_park'], 'nature'],
+  [['hill_station'], 'mountains'],
+  [['museum', 'art_gallery', 'cultural_center', 'performing_arts_theater'], 'culture'],
+  [['restaurant', 'cafe', 'bakery', 'food'], 'food'],
+  [['historical_landmark', 'monument', 'castle', 'fort'], 'historical']
+];
+
+function classifyDestination(types, fallbackCategory) {
+  const set = new Set(types || []);
+  for (const [matchTypes, category] of DESTINATION_TYPE_MAP) {
+    if (matchTypes.some(t => set.has(t))) return category;
+  }
+  // Category tabs already query a themed search, so the fallback is usually
+  // accurate; "all" has no theme to fall back to, hence "historical" — most
+  // top tourist_attraction results are monuments and landmarks.
+  return fallbackCategory === 'all' ? 'historical' : fallbackCategory;
+}
+
 /**
  * Live Explore destinations, straight from Google Places (real names,
  * real ratings, real photos — no hardcoded data).
@@ -219,7 +243,8 @@ async function getDestinations(category = 'all') {
     'places.rating',
     'places.userRatingCount',
     'places.editorialSummary',
-    'places.photos'
+    'places.photos',
+    'places.types'
   ].join(',');
 
   try {
@@ -240,7 +265,7 @@ async function getDestinations(category = 'all') {
         reviews: p.userRatingCount || 0,
         lat: p.location ? p.location.latitude : null,
         lon: p.location ? p.location.longitude : null,
-        category: cat,
+        category: classifyDestination(p.types, cat),
         photoUrl: photo ? `/api/place-photo?ref=${encodeURIComponent(photo)}` : null,
         provider: 'google'
       };
